@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { events, find, type Field } from './data.js';
-import { DAYS } from './tl.js';
-
-const LEVELS = ['low', 'watch', 'alert'];
+import { find, type Field } from './data.js';
 
 const fs = (names: string[]): Field[] =>
 	names.map((name) => ({
@@ -13,34 +10,6 @@ const fs = (names: string[]): Field[] =>
 		center: [0, 0],
 		ring: [[0, 0]]
 	}));
-
-describe('events', () => {
-	it('have unique ids', () => {
-		expect(new Set(events.map((e) => e.id)).size).toBe(events.length);
-	});
-
-	it('end after they start and stay in range', () => {
-		for (const e of events) {
-			expect(e.start).toBeGreaterThanOrEqual(0);
-			expect(e.start).toBeLessThanOrEqual(DAYS);
-			if (e.end !== undefined) {
-				expect(e.end).toBeGreaterThanOrEqual(e.start);
-				expect(e.end).toBeLessThanOrEqual(DAYS);
-			}
-		}
-	});
-
-	it('only use known levels', () => {
-		for (const e of events) {
-			expect(!e.level || LEVELS.includes(e.level)).toBe(true);
-		}
-	});
-
-	it('include imagery passes and anomalies', () => {
-		expect(events.some((e) => e.track === 'imagery')).toBe(true);
-		expect(events.some((e) => e.track === 'ops')).toBe(true);
-	});
-});
 
 describe('find', () => {
 	const list = fs(['North 40', 'Creek Bottom', 'P1036']);

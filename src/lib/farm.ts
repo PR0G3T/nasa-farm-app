@@ -1,11 +1,13 @@
 import type { Field } from './data.js';
 
 export type Params = Record<string, number>;
+export type Trace = { canopy: number[]; water: number[]; stress: number[]; frost: number[] };
 export type Entry = {
 	rotation: string[];
 	rank?: number | null;
 	score?: number;
-	[k: string]: number | string[] | null | undefined;
+	trace?: Trace;
+	[k: string]: number | string[] | Trace | null | undefined;
 };
 export type SiteResult = {
 	status: 'ok' | 'error';

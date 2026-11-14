@@ -4,7 +4,6 @@
 	import Settings from '#lib/Settings.svelte';
 	import Sidebar from '#lib/Sidebar.svelte';
 	import Timeline from '#lib/Timeline.svelte';
-	import { events } from '#lib/data.js';
 	import { fields, meta, sel } from '#lib/state.svelte.js';
 	import type { PageProps } from './$types';
 
@@ -22,11 +21,6 @@
 		if (fields.length) return;
 		fields.push(...list);
 		sel.field ??= fields[0];
-		const names = list.map((f) => f.name);
-		if (names.length)
-			events
-				.filter((e) => e.track === 'ops')
-				.forEach((e, i) => (e.field = names[i % names.length]));
 	});
 </script>
 

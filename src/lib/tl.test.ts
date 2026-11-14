@@ -1,33 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
-	DAYS,
+	BIN,
 	H_HOME,
 	H_MAX,
 	H_MIN,
+	YEAR,
 	clamp,
 	dayAt,
 	dayISO,
 	dayLabel,
-	lanes,
-	months,
-	weeks,
+	dom,
+	month,
+	ticks,
 	x
 } from './tl.js';
-import type { Event } from './data.js';
-
-const ev = (id: string, start: number, end?: number): Event => ({
-	id,
-	label: id,
-	track: 'ops',
-	start,
-	end
-});
 
 describe('x', () => {
-	it('maps days to percentages', () => {
-		expect(x(0)).toBe(0);
-		expect(x(DAYS / 2)).toBe(50);
-		expect(x(DAYS)).toBe(100);
+	it('maps days to percentages of the span', () => {
+		expect(x(0, YEAR)).toBe(0);
+		expect(x(YEAR / 2, YEAR)).toBe(50);
+		expect(x(YEAR, YEAR)).toBe(100);
 	});
 });
 
@@ -41,89 +33,65 @@ describe('clamp', () => {
 
 describe('dayAt', () => {
 	it('converts a ratio to a rounded day', () => {
-		expect(dayAt(0)).toBe(0);
-		expect(dayAt(1)).toBe(DAYS);
-		expect(dayAt(0.5)).toBe(Math.round(DAYS / 2));
+		expect(dayAt(0, YEAR)).toBe(0);
+		expect(dayAt(1, YEAR)).toBe(YEAR);
+		expect(dayAt(0.5, YEAR)).toBe(Math.round(YEAR / 2));
 	});
 
 	it('clamps out-of-range ratios', () => {
-		expect(dayAt(-0.2)).toBe(0);
-		expect(dayAt(1.5)).toBe(DAYS);
+		expect(dayAt(-0.2, YEAR)).toBe(0);
+		expect(dayAt(1.5, YEAR)).toBe(YEAR);
 	});
 });
 
-describe('lanes', () => {
-	it('keeps non-overlapping events on a single lane', () => {
-		expect(lanes([ev('a', 0, 10), ev('b', 12, 20)])).toHaveLength(1);
+describe('ticks', () => {
+	it('labels one major tick per year', () => {
+		const majors = ticks(3 * YEAR).filter((t) => t.major);
+		expect(majors.map((t) => t.label)).toEqual(['Y1', 'Y2', 'Y3']);
 	});
 
-	it('splits overlapping events across lanes', () => {
-		expect(lanes([ev('a', 0, 10), ev('b', 5, 15)])).toHaveLength(2);
-	});
-
-	it('reuses a lane once the gap clears', () => {
-		const out = lanes([ev('a', 0, 10), ev('b', 5, 15), ev('c', 12, 18)]);
-		expect(out).toHaveLength(2);
-		expect(out[0].evs.map((e) => e.id)).toEqual(['a', 'c']);
-	});
-
-	it('labels only the first lane', () => {
-		const out = lanes([ev('a', 0, 10), ev('b', 5, 15)]);
-		expect(out[0].label).toBe('Alerts');
-		expect(out[1].label).toBe('');
-	});
-
-	it('never places overlapping events on the same lane', () => {
-		const input = [ev('a', 0, 50), ev('b', 10, 60), ev('c', 20, 30), ev('d', 55, 70)];
-		for (const row of lanes(input)) {
-			for (let i = 1; i < row.evs.length; i++) {
-				const prev = row.evs[i - 1];
-				expect(row.evs[i].start).toBeGreaterThanOrEqual((prev.end ?? prev.start) + 2);
-			}
-		}
-	});
-
-	it('treats point events as zero-duration', () => {
-		expect(lanes([ev('a', 0, 10), ev('p', 5)])).toHaveLength(2);
-		expect(lanes([ev('p', 5), ev('q', 7)])).toHaveLength(1);
-	});
-
-	it('accepts unsorted input', () => {
-		const out = lanes([ev('b', 6, 15), ev('a', 0, 4)]);
-		expect(out[0].evs.map((e) => e.id)).toEqual(['a', 'b']);
-	});
-});
-
-describe('ruler', () => {
-	it('weeks step by 7 within range', () => {
-		expect(weeks[0]).toBe(0);
-		expect(weeks.at(-1)).toBeLessThanOrEqual(DAYS);
-		for (let i = 1; i < weeks.length; i++) expect(weeks[i] - weeks[i - 1]).toBe(7);
-	});
-
-	it('months are strictly increasing and in range', () => {
-		for (const m of months) expect(m.d).toBeLessThanOrEqual(DAYS);
-		for (let i = 1; i < months.length; i++) {
-			expect(months[i].d).toBeGreaterThan(months[i - 1].d);
-		}
+	it('is strictly increasing and in range', () => {
+		const ts = ticks(3 * YEAR);
+		for (const t of ts) expect(t.d).toBeLessThanOrEqual(3 * YEAR);
+		for (let i = 1; i < ts.length; i++) expect(ts[i].d).toBeGreaterThan(ts[i - 1].d);
 	});
 });
 
 describe('dayLabel', () => {
-	it('formats the timeline start', () => {
-		expect(dayLabel(0)).toBe('Mar 1');
+	it('formats day 0 as year 1 January 1', () => {
+		expect(dayLabel(0)).toBe('Y1 · Jan 1');
+	});
+
+	it('rolls into the next year at the boundary', () => {
+		expect(dayLabel(YEAR)).toBe('Y2 · Jan 1');
 	});
 
 	it('formats any in-range day without crashing', () => {
-		expect(() => dayLabel(DAYS)).not.toThrow();
-		expect(dayLabel(DAYS)).toBeTruthy();
+		expect(dayLabel(3 * YEAR)).toBeTruthy();
+	});
+});
+
+describe('calendar', () => {
+	it('maps doy to month and day-of-month', () => {
+		expect(month(0)).toBe(0);
+		expect(month(31)).toBe(1);
+		expect(dom(0)).toBe(1);
+		expect(dom(31)).toBe(1);
+		expect(dom(59)).toBe(1);
 	});
 });
 
 describe('dayISO', () => {
-	it('formats ISO dates from the timeline start', () => {
-		expect(dayISO(0)).toBe('2026-03-01');
-		expect(dayISO(31)).toBe('2026-04-01');
-		expect(dayISO(DAYS)).toBe('2026-11-01');
+	it('returns a real past-or-today ISO date', () => {
+		const today = new Date().toISOString().slice(0, 10);
+		for (const d of [0, 100, YEAR, 2 * YEAR + 30]) {
+			expect(dayISO(d)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			expect(dayISO(d) <= today).toBe(true);
+		}
+	});
+
+	it('maps sim days to the same doy of the current year', () => {
+		const y = new Date().getUTCFullYear();
+		expect(dayISO(YEAR + 31)).toBe(`${y}-02-01`);
 	});
 });
