@@ -5,8 +5,8 @@ import type { PageServerLoad } from './$types';
 
 const parcels = async (fetcher: typeof fetch) => {
 	try {
-		const res = await fetcher(url());
-		return res.ok ? parse(await res.json()) : [];
+		const response = await fetcher(url());
+		return response.ok ? parse(await response.json()) : [];
 	} catch {
 		return [];
 	}
@@ -15,11 +15,11 @@ const parcels = async (fetcher: typeof fetch) => {
 const live = (fetcher: typeof fetch) =>
 	FARM_API
 		? fetcher(`${FARM_API}/healthz`, { signal: AbortSignal.timeout(3_000) })
-				.then((r) => r.ok)
+				.then((response) => response.ok)
 				.catch(() => false)
 		: Promise.resolve(false);
 
 export const load: PageServerLoad = async ({ fetch }) => {
-	const [fields, file, up] = await Promise.all([parcels(fetch), planFile(fetch), live(fetch)]);
-	return { fields, scenarios: names(file), live: up };
+	const [fields, file, reachable] = await Promise.all([parcels(fetch), planFile(fetch), live(fetch)]);
+	return { fields, scenarios: names(file), live: reachable };
 };

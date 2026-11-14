@@ -1,9 +1,9 @@
 import type { FeatureCollection } from 'geojson';
 import type { Field } from './data.js';
 
-export const ESRI_IMG =
+export const ESRI_IMAGERY =
 	'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-export const ESRI_REF =
+export const ESRI_REFERENCE =
 	'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 export const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 
@@ -16,31 +16,31 @@ export function gibs(date: string): string {
 
 const SPAN = 0.015;
 
-export function preview({ center: [lng, lat] }: Field): string {
-	const bbox = [lng - SPAN, lat - SPAN, lng + SPAN, lat + SPAN].join(',');
-	return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${bbox}&bboxSR=4326&imageSR=4326&size=96,96&format=png32&f=image`;
+export function preview({ center: [longitude, latitude] }: Field): string {
+	const extent = [longitude - SPAN, latitude - SPAN, longitude + SPAN, latitude + SPAN].join(',');
+	return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${extent}&bboxSR=4326&imageSR=4326&size=96,96&format=png32&f=image`;
 }
 
-export const shoelace = (pts: [number, number][]) =>
-	pts.reduce((s, p, i) => {
-		const q = pts[(i + 1) % pts.length];
-		return s + p[0] * q[1] - q[0] * p[1];
+export const shoelace = (points: [number, number][]) =>
+	points.reduce((sum, point, index) => {
+		const next = points[(index + 1) % points.length];
+		return sum + point[0] * next[1] - next[0] * point[1];
 	}, 0) / 2;
 
 export function bounds(ring: [number, number][]): [[number, number], [number, number]] {
-	let w = Infinity,
-		s = Infinity,
-		e = -Infinity,
-		n = -Infinity;
+	let west = Infinity,
+		south = Infinity,
+		east = -Infinity,
+		north = -Infinity;
 	for (const [x, y] of ring) {
-		w = Math.min(w, x);
-		s = Math.min(s, y);
-		e = Math.max(e, x);
-		n = Math.max(n, y);
+		west = Math.min(west, x);
+		south = Math.min(south, y);
+		east = Math.max(east, x);
+		north = Math.max(north, y);
 	}
 	return [
-		[w, s],
-		[e, n]
+		[west, south],
+		[east, north]
 	];
 }
 
@@ -71,11 +71,11 @@ export function mask(hole: [number, number][]): FeatureCollection {
 export function parcels(list: Field[]): FeatureCollection {
 	return {
 		type: 'FeatureCollection',
-		features: list.map((f) => ({
+		features: list.map((field) => ({
 			type: 'Feature',
-			id: f.id,
-			properties: { id: f.id, name: f.name, crop: f.crop, ha: f.ha },
-			geometry: { type: 'Polygon', coordinates: [f.ring] }
+			id: field.id,
+			properties: { id: field.id, name: field.name, crop: field.crop, ha: field.ha },
+			geometry: { type: 'Polygon', coordinates: [field.ring] }
 		}))
 	};
 }

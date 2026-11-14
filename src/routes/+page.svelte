@@ -14,7 +14,7 @@
 		if (meta.live !== live) meta.live = live;
 		if (
 			meta.scenarios.length !== scenarios.length ||
-			meta.scenarios.some((s, i) => s !== scenarios[i])
+			meta.scenarios.some((name, index) => name !== scenarios[index])
 		)
 			meta.scenarios = scenarios;
 		if (scenarios.length && !scenarios.includes(selection.scenario)) selection.scenario = scenarios[0];

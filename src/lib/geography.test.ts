@@ -37,12 +37,12 @@ describe('preview', () => {
 	});
 
 	it('centers a symmetric square bbox on the field', () => {
-		const [w, s, e, n] = url.searchParams.get('bbox')!.split(',').map(Number);
-		expect((w + e) / 2).toBeCloseTo(FIELD.center[0], 10);
-		expect((s + n) / 2).toBeCloseTo(FIELD.center[1], 10);
-		expect(e - w).toBeCloseTo(n - s, 10);
-		expect(w).toBeLessThan(e);
-		expect(s).toBeLessThan(n);
+		const [west, south, east, north] = url.searchParams.get('bbox')!.split(',').map(Number);
+		expect((west + east) / 2).toBeCloseTo(FIELD.center[0], 10);
+		expect((south + north) / 2).toBeCloseTo(FIELD.center[1], 10);
+		expect(east - west).toBeCloseTo(north - south, 10);
+		expect(west).toBeLessThan(east);
+		expect(south).toBeLessThan(north);
 	});
 });
 
@@ -56,38 +56,38 @@ describe('gibs', () => {
 
 describe('bounds', () => {
 	it('contains every vertex tightly', () => {
-		const [[w, s], [e, n]] = bounds(RING);
+		const [[west, south], [east, north]] = bounds(RING);
 		for (const [x, y] of RING) {
-			expect(x).toBeGreaterThanOrEqual(w);
-			expect(x).toBeLessThanOrEqual(e);
-			expect(y).toBeGreaterThanOrEqual(s);
-			expect(y).toBeLessThanOrEqual(n);
+			expect(x).toBeGreaterThanOrEqual(west);
+			expect(x).toBeLessThanOrEqual(east);
+			expect(y).toBeGreaterThanOrEqual(south);
+			expect(y).toBeLessThanOrEqual(north);
 		}
-		expect([w, s, e, n]).toEqual([0, 0, 1, 1]);
+		expect([west, south, east, north]).toEqual([0, 0, 1, 1]);
 	});
 });
 
 describe('mask', () => {
-	const fc = mask(RING);
-	const geom = fc.features[0].geometry;
+	const collection = mask(RING);
+	const geometry = collection.features[0].geometry;
 
 	it('emits a polygon with a world outer ring', () => {
-		expect(geom.type).toBe('Polygon');
-		if (geom.type !== 'Polygon') return;
-		const outer = geom.coordinates[0];
-		expect(Math.min(...outer.map((p) => p[0]))).toBe(-180);
-		expect(Math.max(...outer.map((p) => p[0]))).toBe(180);
+		expect(geometry.type).toBe('Polygon');
+		if (geometry.type !== 'Polygon') return;
+		const outer = geometry.coordinates[0];
+		expect(Math.min(...outer.map((point) => point[0]))).toBe(-180);
+		expect(Math.max(...outer.map((point) => point[0]))).toBe(180);
 		expect(outer[0]).toEqual(outer.at(-1));
 	});
 
 	it('cuts the hole with opposite winding', () => {
-		if (geom.type !== 'Polygon') return;
-		const [outer, hole] = geom.coordinates;
-		const sign = (r: number[][]) =>
+		if (geometry.type !== 'Polygon') return;
+		const [outer, hole] = geometry.coordinates;
+		const sign = (ring: number[][]) =>
 			Math.sign(
-				r.reduce((s, p, i) => {
-					const q = r[(i + 1) % r.length];
-					return s + p[0] * q[1] - q[0] * p[1];
+				ring.reduce((sum, point, index) => {
+					const next = ring[(index + 1) % ring.length];
+					return sum + point[0] * next[1] - next[0] * point[1];
 				}, 0)
 			);
 		expect(hole.length).toBeGreaterThan(2);
@@ -95,36 +95,36 @@ describe('mask', () => {
 	});
 
 	it('keeps the hole inside the outer ring', () => {
-		if (geom.type !== 'Polygon') return;
-		const [outer, hole] = geom.coordinates;
-		const [w, s, e, n] = [
-			Math.min(...outer.map((p) => p[0])),
-			Math.min(...outer.map((p) => p[1])),
-			Math.max(...outer.map((p) => p[0])),
-			Math.max(...outer.map((p) => p[1]))
+		if (geometry.type !== 'Polygon') return;
+		const [outer, hole] = geometry.coordinates;
+		const [west, south, east, north] = [
+			Math.min(...outer.map((point) => point[0])),
+			Math.min(...outer.map((point) => point[1])),
+			Math.max(...outer.map((point) => point[0])),
+			Math.max(...outer.map((point) => point[1]))
 		];
 		for (const [x, y] of hole) {
-			expect(x).toBeGreaterThan(w);
-			expect(x).toBeLessThan(e);
-			expect(y).toBeGreaterThan(s);
-			expect(y).toBeLessThan(n);
+			expect(x).toBeGreaterThan(west);
+			expect(x).toBeLessThan(east);
+			expect(y).toBeGreaterThan(south);
+			expect(y).toBeLessThan(north);
 		}
 	});
 });
 
 describe('parcels', () => {
-	const fc = parcels([FIELD]);
+	const collection = parcels([FIELD]);
 
 	it('emits one feature per field with matching id', () => {
-		expect(fc.features).toHaveLength(1);
-		expect(fc.features[0].id).toBe(FIELD.id);
-		expect(fc.features[0].properties?.name).toBe(FIELD.name);
+		expect(collection.features).toHaveLength(1);
+		expect(collection.features[0].id).toBe(FIELD.id);
+		expect(collection.features[0].properties?.name).toBe(FIELD.name);
 	});
 
 	it('emits the field ring as a closed polygon', () => {
-		const geom = fc.features[0].geometry;
-		expect(geom.type).toBe('Polygon');
-		if (geom.type !== 'Polygon') return;
-		expect(geom.coordinates[0]).toEqual(RING);
+		const geometry = collection.features[0].geometry;
+		expect(geometry.type).toBe('Polygon');
+		if (geometry.type !== 'Polygon') return;
+		expect(geometry.coordinates[0]).toEqual(RING);
 	});
 });

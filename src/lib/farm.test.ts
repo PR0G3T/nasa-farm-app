@@ -57,9 +57,9 @@ describe('recommend', () => {
 		);
 		vi.stubGlobal('fetch', spy);
 		expect(await recommend(field, 'warm')).toEqual(site);
-		const [u, init] = spy.mock.calls[0];
-		expect(u).toBe('/api/plan');
-		expect(JSON.parse(init.body)).toEqual({
+		const [target, options] = spy.mock.calls[0];
+		expect(target).toBe('/api/plan');
+		expect(JSON.parse(options.body)).toEqual({
 			id: 'P1',
 			lat: 48.2,
 			lon: 1.61,

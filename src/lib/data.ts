@@ -7,7 +7,7 @@ export type Field = {
 	ring: [number, number][];
 };
 
-export function find(list: Field[], q: string): Field[] {
-	const s = q.trim().toLowerCase();
-	return s ? list.filter((f) => f.name.toLowerCase().includes(s)) : list;
+export function find(list: Field[], query: string): Field[] {
+	const term = query.trim().toLowerCase();
+	return term ? list.filter((field) => field.name.toLowerCase().includes(term)) : list;
 }

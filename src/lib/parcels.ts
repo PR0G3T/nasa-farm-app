@@ -14,9 +14,9 @@ const REGION: [number, number][] = [
 ];
 
 export function url(): string {
-	const geom = { type: 'Polygon', coordinates: [REGION] };
+	const geometry = { type: 'Polygon', coordinates: [REGION] };
 	return `https://apicarto.ign.fr/api/rpg/v2?geom=${encodeURIComponent(
-		JSON.stringify(geom)
+		JSON.stringify(geometry)
 	)}&annee=${YEAR}`;
 }
 
@@ -39,50 +39,50 @@ const CULTURES: Record<string, string> = {
 	PTC: 'Pomme de terre'
 };
 
-const close = (r: [number, number][]) =>
-	r[0][0] === r.at(-1)![0] && r[0][1] === r.at(-1)![1] ? r : [...r, r[0]];
+const close = (ring: [number, number][]) =>
+	ring[0][0] === ring.at(-1)![0] && ring[0][1] === ring.at(-1)![1] ? ring : [...ring, ring[0]];
 
-const outer = (g: Polygon | MultiPolygon): [number, number][][] =>
-	g.type === 'Polygon'
-		? [close(g.coordinates[0] as [number, number][])]
-		: g.coordinates.map((p) => close(p[0] as [number, number][]));
+const outer = (geometry: Polygon | MultiPolygon): [number, number][][] =>
+	geometry.type === 'Polygon'
+		? [close(geometry.coordinates[0] as [number, number][])]
+		: geometry.coordinates.map((part) => close(part[0] as [number, number][]));
 
 export function centroid(ring: [number, number][]): [number, number] {
-	let a = 0;
+	let area = 0;
 	let x = 0;
 	let y = 0;
-	for (let i = 0; i < ring.length - 1; i++) {
-		const [px, py] = ring[i];
-		const [qx, qy] = ring[i + 1];
-		const c = px * qy - qx * py;
-		a += c;
-		x += (px + qx) * c;
-		y += (py + qy) * c;
+	for (let index = 0; index < ring.length - 1; index++) {
+		const [x0, y0] = ring[index];
+		const [x1, y1] = ring[index + 1];
+		const cross = x0 * y1 - x1 * y0;
+		area += cross;
+		x += (x0 + x1) * cross;
+		y += (y0 + y1) * cross;
 	}
-	return a ? [x / (3 * a), y / (3 * a)] : ring[0];
+	return area ? [x / (3 * area), y / (3 * area)] : ring[0];
 }
 
-export function parse(fc: FeatureCollection): Field[] {
-	return fc.features
+export function parse(collection: FeatureCollection): Field[] {
+	return collection.features
 		.filter(
-			(f) =>
-				(f.properties?.surf_parc ?? 0) > 0 &&
-				(f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiPolygon')
+			(feature) =>
+				(feature.properties?.surf_parc ?? 0) > 0 &&
+				(feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon')
 		)
-		.map((f): Field => {
-			const ring = outer(f.geometry as Polygon | MultiPolygon).reduce((a, b) =>
-				Math.abs(shoelace(a)) > Math.abs(shoelace(b)) ? a : b
+		.map((feature): Field => {
+			const ring = outer(feature.geometry as Polygon | MultiPolygon).reduce((largest, other) =>
+				Math.abs(shoelace(largest)) > Math.abs(shoelace(other)) ? largest : other
 			);
-			const p = f.properties ?? {};
+			const properties = feature.properties ?? {};
 			return {
-				id: String(p.id_parcel ?? f.id),
-				name: `P${p.id_parcel ?? f.id}`,
-				crop: CULTURES[p.code_cultu as string] ?? p.code_cultu ?? 'Autre',
-				ha: p.surf_parc,
+				id: String(properties.id_parcel ?? feature.id),
+				name: `P${properties.id_parcel ?? feature.id}`,
+				crop: CULTURES[properties.code_cultu as string] ?? properties.code_cultu ?? 'Autre',
+				ha: properties.surf_parc,
 				center: centroid(ring),
 				ring
 			};
 		})
-		.toSorted((a, b) => b.ha - a.ha)
+		.toSorted((first, second) => second.ha - first.ha)
 		.slice(0, MAX);
 }

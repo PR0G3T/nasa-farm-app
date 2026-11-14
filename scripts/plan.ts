@@ -7,34 +7,34 @@ import { parse, url } from '../src/lib/parcels.ts';
 
 const app = fileURLToPath(new URL('..', import.meta.url));
 const farm = fileURLToPath(new URL('../../nasa-farm', import.meta.url));
-const args = process.argv.slice(2);
-const scenarios = args.length
-	? args
+const inputs = process.argv.slice(2);
+const scenarios = inputs.length
+	? inputs
 	: ['baseline', 'warm:delta_t=2', 'dry:precip_scale=0.8'];
 
-const res = await fetch(url());
-if (!res.ok) throw new Error(`apicarto ${res.status}`);
-const pts = parse(await res.json()).map((f) => ({
-	id: f.id,
-	name: f.name,
-	crop: f.crop,
-	ha: f.ha,
-	lat: f.center[1],
-	lon: f.center[0]
+const response = await fetch(url());
+if (!response.ok) throw new Error(`apicarto ${response.status}`);
+const points = parse(await response.json()).map((field) => ({
+	id: field.id,
+	name: field.name,
+	crop: field.crop,
+	ha: field.ha,
+	lat: field.center[1],
+	lon: field.center[0]
 }));
-console.log(`${pts.length} parcels → ${scenarios.join(', ')}`);
+console.log(`${points.length} parcels → ${scenarios.join(', ')}`);
 
 const envFile = `${farm}/.env`;
-const proc = Bun.spawn(
+const child = Bun.spawn(
 	[
 		'uv', 'run', '--directory', farm,
 		...(await Bun.file(envFile).exists() ? ['--env-file', envFile] : []),
 		'nasa-farm', 'export',
 		'--fields', '-', '--out', `${app}/static/plan.json`,
-		...scenarios.flatMap((s) => ['--scenario', s])
+		...scenarios.flatMap((scenario) => ['--scenario', scenario])
 	],
 	{ stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' }
 );
-proc.stdin.write(JSON.stringify(pts));
-proc.stdin.end();
-process.exit(await proc.exited);
+child.stdin.write(JSON.stringify(points));
+child.stdin.end();
+process.exit(await child.exited);

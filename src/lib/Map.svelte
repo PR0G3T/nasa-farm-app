@@ -20,7 +20,7 @@
 	import type { Map as MaplibreMap, MapLayerMouseEvent, StyleSpecification } from 'maplibre-gl';
 	import type { FeatureCollection } from 'geojson';
 	import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
-	import { DEM, ESRI_IMG, ESRI_REF, bounds, gibs, mask, parcels } from '#lib/geography.js';
+	import { DEM, ESRI_IMAGERY, ESRI_REFERENCE, bounds, gibs, mask, parcels } from '#lib/geography.js';
 	import { fields, historyOffset, selection, view, startYear } from '#lib/state.svelte.js';
 	import { dayISO } from '#lib/timeline.js';
 	import { untrack } from 'svelte';
@@ -30,39 +30,39 @@
 	const IDLE = 30_000;
 	const RATE = 6;
 
-	let raf = 0;
+	let animation = 0;
 	let idle: ReturnType<typeof setTimeout>;
-	let t0 = 0;
-	let b0 = 0;
+	let started = 0;
+	let bearing = 0;
 	let orbiting = false;
 
 	function frame(now: number) {
-		map?.jumpTo({ bearing: b0 + ((now - t0) / 1000) * RATE });
-		raf = requestAnimationFrame(frame);
+		map?.jumpTo({ bearing: bearing + ((now - started) / 1000) * RATE });
+		animation = requestAnimationFrame(frame);
 	}
 
 	function startOrbit() {
 		if (!map) return;
 		orbiting = true;
-		b0 = map.getBearing();
+		bearing = map.getBearing();
 		const field = selection.field;
 		map.easeTo({
 			...(field && { center: field.center }),
 			pitch: 55,
 			duration: 1500
 		});
-		t0 = performance.now();
-		raf = requestAnimationFrame(frame);
+		started = performance.now();
+		animation = requestAnimationFrame(frame);
 	}
 
 	let resuming = false;
 
-	function touch(now = false) {
+	function touch(immediate = false) {
 		if (orbiting) {
 			orbiting = false;
-			cancelAnimationFrame(raf);
+			cancelAnimationFrame(animation);
 			map?.stop();
-			if (now) map?.easeTo({ pitch: 0, duration: 900 });
+			if (immediate) map?.easeTo({ pitch: 0, duration: 900 });
 			else resuming = true;
 		}
 		clearTimeout(idle);
@@ -79,7 +79,7 @@
 	const style: StyleSpecification = {
 		version: 8,
 		sources: {
-			dem: {
+			elevation: {
 				type: 'raster-dem',
 				tiles: [DEM],
 				tileSize: 256,
@@ -88,7 +88,7 @@
 				attribution: 'AWS Open Data Terrain Tiles'
 			}
 		},
-		terrain: { source: 'dem', exaggeration: 1.5 },
+		terrain: { source: 'elevation', exaggeration: 1.5 },
 		layers: [
 			{
 				id: 'space',
@@ -99,20 +99,20 @@
 	};
 
 	const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
-	const fc = $derived(parcels(fields));
-	const iso = $derived(dayISO(view.day, historyOffset(), startYear()));
-	const selId = $derived(selection.field?.id ?? '');
-	const dim = $derived(selection.field ? mask(selection.field.ring) : null);
+	const features = $derived(parcels(fields));
+	const date = $derived(dayISO(view.day, historyOffset(), startYear()));
+	const selected = $derived(selection.field?.id ?? '');
+	const shade = $derived(selection.field ? mask(selection.field.ring) : null);
 	const picked = (id: string): ExpressionSpecification => ['==', ['get', 'id'], id];
 
-	function pick(e: MapLayerMouseEvent) {
-		const id = e.features?.[0]?.properties?.id;
-		const field = fields.find((f) => f.id === id);
+	function pick(event: MapLayerMouseEvent) {
+		const id = event.features?.[0]?.properties?.id;
+		const field = fields.find((candidate) => candidate.id === id);
 		if (field) selection.field = field;
 	}
 
-	const cursor = (v: string) => () => {
-		if (map) map.getCanvas().style.cursor = v;
+	const cursor = (value: string) => () => {
+		if (map) map.getCanvas().style.cursor = value;
 	};
 
 	$effect(() => {
@@ -126,7 +126,7 @@
 		untrack(touch);
 		return () => {
 			clearTimeout(idle);
-			cancelAnimationFrame(raf);
+			cancelAnimationFrame(animation);
 		};
 	});
 </script>
@@ -135,7 +135,7 @@
 <div
 	class="h-full w-full"
 	onpointerdown={() => touch()}
-	onpointermove={(e) => e.buttons === 1 && touch()}
+	onpointermove={(event) => event.buttons === 1 && touch()}
 	onpointerup={release}
 	onpointercancel={release}
 	onwheel={() => touch(true)}
@@ -151,7 +151,7 @@
 		class="h-full w-full"
 	>
 		<RasterTileSource
-			tiles={[ESRI_IMG]}
+			tiles={[ESRI_IMAGERY]}
 			tileSize={256}
 			attribution="Esri, Maxar, Earthstar Geographics"
 		>
@@ -160,7 +160,7 @@
 
 		<RasterTileSource
 			id="gibs"
-			tiles={[gibs(iso)]}
+			tiles={[gibs(date)]}
 			tileSize={256}
 			maxzoom={9}
 			attribution="NASA Global Imagery Browse Services"
@@ -172,36 +172,36 @@
 		</RasterTileSource>
 
 		<HillshadeLayer
-			source="dem"
+			source="elevation"
 			paint={{ 'hillshade-exaggeration': 0.25, 'hillshade-shadow-color': '#0a0a0a' }}
 		/>
 
-		<GeoJSONSource data={dim ?? EMPTY}>
+		<GeoJSONSource data={shade ?? EMPTY}>
 			<FillLayer
-				paint={{ 'fill-color': '#000000', 'fill-opacity': dim ? 0.5 : 0 }}
+				paint={{ 'fill-color': '#000000', 'fill-opacity': shade ? 0.5 : 0 }}
 			/>
 		</GeoJSONSource>
 
-		<GeoJSONSource data={fc} promoteId="id">
+		<GeoJSONSource data={features} promoteId="id">
 			<FillLayer
 				onclick={pick}
 				onmousemove={cursor('pointer')}
 				onmouseleave={cursor('')}
 				paint={{
 					'fill-color': '#ffffff',
-					'fill-opacity': ['case', picked(selId), 0.16, 0.07]
+					'fill-opacity': ['case', picked(selected), 0.16, 0.07]
 				}}
 			/>
 			<LineLayer
 				paint={{
 					'line-color': '#ffffff',
-					'line-opacity': ['case', picked(selId), 1, 0.45],
-					'line-width': ['case', picked(selId), 2.5, 1]
+					'line-opacity': ['case', picked(selected), 1, 0.45],
+					'line-width': ['case', picked(selected), 2.5, 1]
 				}}
 			/>
 		</GeoJSONSource>
 
-		<RasterTileSource tiles={[ESRI_REF]} tileSize={256}>
+		<RasterTileSource tiles={[ESRI_REFERENCE]} tileSize={256}>
 			<RasterLayer />
 		</RasterTileSource>
 
