@@ -9,13 +9,9 @@
 		FillLayer,
 		LineLayer,
 		NavigationControl,
-		GlobeControl,
-		FullScreenControl,
 		ScaleControl,
 		AttributionControl,
-		TerrainControl,
 		CustomControl,
-		Projection,
 		Sky,
 		Light,
 		Hash
@@ -150,6 +146,7 @@
 		{style}
 		center={[1.61, 48.2]}
 		zoom={10.5}
+		attributionControl={false}
 		autoloadGlobalCss={false}
 		class="h-full w-full"
 	>
@@ -230,10 +227,7 @@
 		<Light anchor="viewport" position={[1.15, 210, 30]} />
 
 		<Hash />
-		<Projection type="globe" />
 		<NavigationControl position="top-right" visualizePitch />
-		<GlobeControl position="top-right" />
-		<TerrainControl position="top-right" source="dem" />
 		<CustomControl position="top-right" group>
 			<button
 				type="button"
@@ -245,7 +239,6 @@
 				<IconSatellite size={18} stroke={1.75} />
 			</button>
 		</CustomControl>
-		<FullScreenControl position="top-right" />
 		<ScaleControl position="bottom-left" />
 		<AttributionControl position="bottom-right" compact />
 	</MapLibre>
