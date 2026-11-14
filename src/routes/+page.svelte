@@ -11,14 +11,18 @@
 	let { data }: PageProps = $props();
 
 	$effect(() => {
-		meta.scenarios = data.scenarios;
-		meta.live = data.live;
-		if (meta.scenarios.length && !meta.scenarios.includes(sel.scenario))
-			sel.scenario = meta.scenarios[0];
+		const { scenarios, live, fields: list } = data;
+		if (meta.live !== live) meta.live = live;
+		if (
+			meta.scenarios.length !== scenarios.length ||
+			meta.scenarios.some((s, i) => s !== scenarios[i])
+		)
+			meta.scenarios = scenarios;
+		if (scenarios.length && !scenarios.includes(sel.scenario)) sel.scenario = scenarios[0];
 		if (fields.length) return;
-		fields.push(...data.fields);
+		fields.push(...list);
 		sel.field ??= fields[0];
-		const names = data.fields.map((f) => f.name);
+		const names = list.map((f) => f.name);
 		if (names.length)
 			events
 				.filter((e) => e.track === 'ops')
