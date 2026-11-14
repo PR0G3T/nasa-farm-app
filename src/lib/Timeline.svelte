@@ -5,7 +5,7 @@
 	const cur = $derived(sel.field ? recs[sel.field.id]?.[sel.scenario] : undefined);
 	const top = $derived(cur?.status === 'ok' ? cur?.top?.[0] : undefined);
 	const trace = $derived(top?.trace);
-	const span = $derived(trace ? trace.water.length * BIN : YEAR);
+	const span = $derived((top?.rotation.length ?? 1) * YEAR);
 	const date = $derived(dayLabel(ui.day));
 
 	const stressLevel = (p: number): 'watch' | 'alert' | null =>
