@@ -33,13 +33,54 @@
 		})
 	);
 
-	const COL = { watch: '--color-warn', alert: '--color-alert', mute: '--color-mute' } as const;
+	const COL = {
+		watch: '--color-warn',
+		alert: '--color-alert',
+		mute: '--color-mute',
+		accent: '--color-accent'
+	} as const;
 	type Col = keyof typeof COL;
 
 	const stripe = (c: Col) =>
 		`repeating-linear-gradient(-45deg, var(${COL[c]}) 0 0.1875rem, color-mix(in oklab, var(${COL[c]}) 18%, transparent) 0.1875rem 0.5rem)`;
+	const mini = (c: Col) =>
+		`repeating-linear-gradient(-45deg, var(${COL[c]}) 0 0.125rem, color-mix(in oklab, var(${COL[c]}) 22%, transparent) 0.125rem 0.375rem)`;
+	const veil = (c: Col) =>
+		`repeating-linear-gradient(-45deg, color-mix(in oklab, var(${COL[c]}) 32%, transparent) 0 0.1875rem, color-mix(in oklab, var(${COL[c]}) 10%, transparent) 0.1875rem 0.5rem)`;
 	const solid = (c: Col) => `color-mix(in oklab, var(${COL[c]}) 45%, transparent)`;
-	const fill = (c: Col) => `color-mix(in oklab, var(${COL[c]}) 70%, transparent)`;
+
+	const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize);
+	const dl = (d: number) => dayLabel(d, hOff(), y0());
+
+	type Tip = { x: number; y0: number; y1: number; head: string; sub: string };
+	let tip = $state<Tip | null>(null);
+
+	function tipOn(e: PointerEvent, head: string, sub: string) {
+		if (e.buttons) return;
+		const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+		tip = { x: r.left + r.width / 2, y0: r.top, y1: r.bottom, head, sub };
+	}
+	const tipOff = () => (tip = null);
+	const tipX = $derived(
+		tip ? Math.min(Math.max(tip.x, 4 * rem()), window.innerWidth - 4 * rem()) : 0
+	);
+	const tipUp = $derived(tip !== null && tip.y0 > 4.5 * rem());
+
+	const wPts = $derived(
+		(trace?.water ?? []).map(
+			(v, i) => [hOff() + i * BIN + BIN / 2, (1 - v) * 30 + 1] as const
+		)
+	);
+	const wLine = $derived(
+		wPts.length ? `M${wPts.map((p) => p.join(' ')).join(' L')}` : ''
+	);
+	const wClip = $derived(
+		wPts.length
+			? `polygon(${x(wPts[0][0], span)}% 100%, ${wPts
+					.map((p) => `${x(p[0], span)}% ${(p[1] / 32) * 100}%`)
+					.join(', ')}, ${x(wPts[wPts.length - 1][0], span)}% 100%)`
+			: 'none'
+	);
 
 	type Row = {
 		id: 'rotation' | 'water' | Hazard;
@@ -69,7 +110,6 @@
 	let y = 0;
 	let h0 = H_HOME;
 
-	const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize);
 	const setH = (v: number) => (h = clamp(v, H_MIN, H_MAX));
 
 	/** Content height in rem: header 2.25 + ruler 1.5 + rows 2 + group head 1.75 + lanes 2. */
@@ -100,6 +140,7 @@
 	}
 
 	function grab(e: PointerEvent) {
+		tip = null;
 		area.setPointerCapture(e.pointerId);
 		seek(e);
 	}
@@ -111,14 +152,20 @@
 	}
 </script>
 
-{#snippet strips(tr?: Trace)}
-	<div class="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col gap-1">
+{#snippet strips(tr: Trace | undefined, label: string)}
+	<div class="absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col gap-1">
 		{#each HAZARDS as hid (hid)}
 			<div class="relative h-1.5">
 				{#each hazard(hid, tr) as [s, e, c] (s)}
+					{@const lab = `${label} · ${hid} · ${c} · ${dl(hOff() + s)} → ${dl(hOff() + e)}`}
 					<div
+						role="img"
+						aria-label={lab}
+						onpointerenter={(ev) =>
+							tipOn(ev, `${label} · ${hid} · ${c}`, `${dl(hOff() + s)} → ${dl(hOff() + e)}`)}
+						onpointerleave={tipOff}
 						class="absolute inset-y-0 rounded-sm"
-						style="left: {x(hOff() + s, span)}%; width: {x(e - s, span)}%; background: {fill(c)}"
+						style="left: {x(hOff() + s, span)}%; width: {x(e - s, span)}%; background-image: {mini(c)}"
 					></div>
 				{/each}
 			</div>
@@ -152,7 +199,7 @@
 		<span class="text-xs tabular-nums text-ink">{date}</span>
 	</header>
 
-	<div class="flex min-h-0 flex-1 items-start overflow-y-auto">
+	<div class="flex min-h-0 flex-1 items-start overflow-y-auto" onscroll={tipOff}>
 		<div class="flex w-16 shrink-0 flex-col border-r border-edge">
 			<div class="h-6 shrink-0 border-b border-edge"></div>
 			{#each rows as row (row.id)}
@@ -231,21 +278,33 @@
 					{#if row.id === 'rotation'}
 						{#each top?.rotation ?? [] as crop, y (y)}
 							{@const win = canopy(trace?.canopy, y)}
+							{@const sub = win
+								? `canopy ${dl(hOff() + win[0])} → ${dl(hOff() + win[1])}`
+								: 'planned'}
 							<div
-								title="{crop} · year {y + 1}"
-								class="absolute top-1/2 flex h-5 -translate-y-1/2 items-center overflow-hidden rounded bg-raise px-1.5 text-[0.625rem] whitespace-nowrap text-ink"
+								role="img"
+								aria-label="{crop} · Y{y + 1} · {sub}"
+								onpointerenter={(ev) => tipOn(ev, `${crop} · Y${y + 1}`, sub)}
+								onpointerleave={tipOff}
+								class="pred absolute top-1/2 flex h-5 -translate-y-1/2 items-center overflow-hidden rounded bg-raise px-1.5 text-[0.625rem] whitespace-nowrap text-ink"
 								style="left: {x(hOff() + y * YEAR, span)}%; width: {x(YEAR, span)}%"
 							>
 								{crop}
 								{#if win}
 									<div
-										class="absolute bottom-0 h-1 bg-accent/60"
+										class="pred absolute bottom-0 h-1 bg-accent/60"
 										style="left: {x(win[0] - y * YEAR, YEAR)}%; width: {x(win[1] - win[0], YEAR)}%"
 									></div>
 								{/if}
 							</div>
 						{/each}
 					{:else if row.id === 'water'}
+						{#if wPts.length}
+							<div
+								class="absolute inset-0"
+								style="clip-path: {wClip}; background-image: {veil('accent')}"
+							></div>
+						{/if}
 						{#if hist?.sm || trace}
 							<svg
 								class="absolute inset-0 h-full w-full"
@@ -264,12 +323,11 @@
 										vector-effect="non-scaling-stroke"
 									/>
 								{/if}
-								{#if trace}
+								{#if wLine}
 									<path
-										d="M{hOff()} 32 {trace.water
-											.map((v, i) => `L${hOff() + i * BIN + BIN / 2} ${(1 - v) * 30 + 1}`)
-											.join(' ')} L{hOff() + trace.water.length * BIN} 32 Z"
-										class="fill-accent/20 stroke-accent"
+										d={wLine}
+										fill="none"
+										class="stroke-accent"
 										stroke-width="1.5"
 										vector-effect="non-scaling-stroke"
 									/>
@@ -280,7 +338,11 @@
 						{#if hist && row.hist}
 							{#each hist[row.hist] as [s, e] (s)}
 								<div
-									title="{row.hist} · observed · {dayLabel(s, hOff(), y0())} → {dayLabel(e, hOff(), y0())}"
+									role="img"
+									aria-label="{row.label} · observed · {dl(s)} → {dl(e)}"
+									onpointerenter={(ev) =>
+										tipOn(ev, `${row.label} · observed`, `${dl(s)} → ${dl(e)}`)}
+									onpointerleave={tipOff}
 									class="absolute top-1/2 h-5 -translate-y-1/2 rounded-sm"
 									style="left: {x(s, span)}%; width: {x(e - s, span)}%; background: {solid(
 										row.id === 'stress' ? 'watch' : row.id === 'heat' ? 'alert' : 'mute'
@@ -290,7 +352,11 @@
 						{/if}
 						{#each hazard(row.id, trace) as [s, e, c] (s)}
 							<div
-								title="{row.id} · predicted · {dayLabel(hOff() + s, hOff(), y0())} → {dayLabel(hOff() + e, hOff(), y0())}"
+								role="img"
+								aria-label="{row.label} · predicted · {c} · {dl(hOff() + s)} → {dl(hOff() + e)}"
+								onpointerenter={(ev) =>
+									tipOn(ev, `${row.label} · predicted · ${c}`, `${dl(hOff() + s)} → ${dl(hOff() + e)}`)}
+								onpointerleave={tipOff}
 								class="absolute top-1/2 h-5 -translate-y-1/2 rounded-sm border"
 								style="left: {x(hOff() + s, span)}%; width: {x(e - s, span)}%; background-image: {stripe(
 									c
@@ -302,7 +368,7 @@
 			{/each}
 
 			<div class="relative h-7 border-b border-edge">
-				{@render strips(trace)}
+				{@render strips(trace, sel.scenario)}
 			</div>
 			{#if ui.cmp}
 				{#each lanes as lane (lane.s)}
@@ -312,7 +378,7 @@
 								class="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 animate-pulse rounded-sm bg-raise"
 							></div>
 						{:else}
-							{@render strips(lane.tr)}
+							{@render strips(lane.tr, lane.s)}
 						{/if}
 					</div>
 				{/each}
@@ -335,4 +401,17 @@
 			</div>
 		</div>
 	</div>
+
+	{#if tip}
+		<div
+			role="tooltip"
+			class="pointer-events-none fixed z-50 -translate-x-1/2 rounded-md border border-edge bg-panel px-2 py-1 shadow-lg {tipUp
+				? '-translate-y-full'
+				: ''}"
+			style="left: {tipX}px; top: {tipUp ? tip.y0 - 6 : tip.y1 + 6}px"
+		>
+			<p class="capitalize text-[0.625rem] font-medium whitespace-nowrap text-ink">{tip.head}</p>
+			<p class="text-[0.625rem] whitespace-nowrap text-mute">{tip.sub}</p>
+		</div>
+	{/if}
 </section>

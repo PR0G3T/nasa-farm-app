@@ -67,6 +67,14 @@ html.dark {
 		transition: color 160ms, background-color 160ms;
 	}
 
+	.pred {
+		background-image: repeating-linear-gradient(
+			-45deg,
+			color-mix(in oklab, var(--color-ink) 12%, transparent) 0 0.1875rem,
+			transparent 0.1875rem 0.5rem
+		);
+	}
+
 	dialog::backdrop {
 		background: oklch(0 0 0 / 40%);
 	}
