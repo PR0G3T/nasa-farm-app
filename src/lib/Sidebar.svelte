@@ -3,9 +3,9 @@
 	import IconSearch from '@tabler/icons-svelte-runes/icons/search';
 	import IconCollapse from '@tabler/icons-svelte-runes/icons/layout-sidebar-left-collapse';
 	import IconExpand from '@tabler/icons-svelte-runes/icons/layout-sidebar-left-expand';
-	import { fields, find } from '#lib/data.js';
+	import { find } from '#lib/data.js';
 	import { preview } from '#lib/geo.js';
-	import { sel, ui } from '#lib/state.svelte.js';
+	import { fields, sel, ui } from '#lib/state.svelte.js';
 
 	let collapsed = $state(false);
 	let query = $state('');
@@ -14,7 +14,7 @@
 </script>
 
 <aside
-	class="flex h-full flex-col border-r border-edge bg-panel transition-[width] duration-200 ease-out {collapsed
+	class="flex h-full min-h-0 flex-col border-r border-edge bg-panel transition-[width] duration-200 ease-out {collapsed
 		? 'w-14'
 		: 'w-72'}"
 >

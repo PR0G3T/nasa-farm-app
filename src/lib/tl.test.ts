@@ -6,6 +6,7 @@ import {
 	H_MIN,
 	clamp,
 	dayAt,
+	dayISO,
 	dayLabel,
 	lanes,
 	months,
@@ -116,5 +117,13 @@ describe('dayLabel', () => {
 	it('formats any in-range day without crashing', () => {
 		expect(() => dayLabel(DAYS)).not.toThrow();
 		expect(dayLabel(DAYS)).toBeTruthy();
+	});
+});
+
+describe('dayISO', () => {
+	it('formats ISO dates from the timeline start', () => {
+		expect(dayISO(0)).toBe('2026-03-01');
+		expect(dayISO(31)).toBe('2026-04-01');
+		expect(dayISO(DAYS)).toBe('2026-11-01');
 	});
 });

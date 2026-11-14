@@ -27,6 +27,7 @@ export const dayAt = (ratio: number) => clamp(Math.round(ratio * DAYS), 0, DAYS)
 
 const fmt = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' });
 export const dayLabel = (day: number) => fmt.format(START + day * DAY_MS);
+export const dayISO = (day: number) => new Date(START + day * DAY_MS).toISOString().slice(0, 10);
 
 export type Row = { label: string; evs: Event[] };
 
