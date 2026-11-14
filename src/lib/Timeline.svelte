@@ -41,14 +41,18 @@
 	const solid = (c: Col) => `color-mix(in oklab, var(${COL[c]}) 45%, transparent)`;
 	const fill = (c: Col) => `color-mix(in oklab, var(${COL[c]}) 70%, transparent)`;
 
-	const rows: { id: 'rotation' | 'water' | Hazard; label: string; hist: 'dry' | 'heat' | 'frost' | null }[] =
-		[
-			{ id: 'rotation', label: 'Rotation', hist: null },
-			{ id: 'water', label: 'Water', hist: null },
-			{ id: 'stress', label: 'Stress', hist: 'dry' },
-			{ id: 'heat', label: 'Heat', hist: 'heat' },
-			{ id: 'frost', label: 'Frost', hist: 'frost' }
-		];
+	type Row = {
+		id: 'rotation' | 'water' | Hazard;
+		label: string;
+		hist: 'dry' | 'heat' | 'frost' | null;
+	};
+	const rows: Row[] = [
+		{ id: 'rotation', label: 'Rotation', hist: null },
+		{ id: 'water', label: 'Water', hist: null },
+		{ id: 'stress', label: 'Stress', hist: 'dry' },
+		{ id: 'heat', label: 'Heat', hist: 'heat' },
+		{ id: 'frost', label: 'Frost', hist: 'frost' }
+	];
 
 	$effect(() => {
 		const field = sel.field;
