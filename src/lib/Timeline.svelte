@@ -1,6 +1,23 @@
 <script lang="ts">
-	import { cur, hOff, ui, y0 } from '#lib/state.svelte.js';
-	import { BIN, H_HOME, H_MAX, H_MIN, YEAR, clamp, dayAt, dayLabel, ticks, x } from '#lib/tl.js';
+	import IconChevron from '@tabler/icons-svelte-runes/icons/chevron-down';
+	import type { Trace } from '#lib/farm.js';
+	import { cur, ensure, hOff, recs, scen, sel, ui, y0 } from '#lib/state.svelte.js';
+	import {
+		BIN,
+		HAZARDS,
+		H_HOME,
+		H_MAX,
+		H_MIN,
+		YEAR,
+		canopy,
+		clamp,
+		dayAt,
+		dayLabel,
+		hazard,
+		ticks,
+		x
+	} from '#lib/tl.js';
+	import type { Hazard } from '#lib/tl.js';
 
 	const top = $derived(cur()?.status === 'ok' ? cur()?.top?.[0] : undefined);
 	const trace = $derived(top?.trace);
@@ -9,54 +26,34 @@
 	const span = $derived(hOff() + fYears * YEAR);
 	const date = $derived(dayLabel(ui.day, hOff(), y0()));
 
+	const lanes = $derived(
+		scen().map((s) => {
+			const res = sel.field ? recs[sel.field.id]?.[s] : undefined;
+			return { s, res, tr: res?.status === 'ok' ? res.top?.[0]?.trace : undefined };
+		})
+	);
+
 	const COL = { watch: '--color-warn', alert: '--color-alert', mute: '--color-mute' } as const;
 	type Col = keyof typeof COL;
 
 	const stripe = (c: Col) =>
 		`repeating-linear-gradient(-45deg, var(${COL[c]}) 0 0.1875rem, color-mix(in oklab, var(${COL[c]}) 18%, transparent) 0.1875rem 0.5rem)`;
 	const solid = (c: Col) => `color-mix(in oklab, var(${COL[c]}) 45%, transparent)`;
+	const fill = (c: Col) => `color-mix(in oklab, var(${COL[c]}) 70%, transparent)`;
 
-	function bands(
-		probs: number[] | undefined,
-		cut: (p: number) => Col | null
-	): [number, number, Col][] {
-		const out: [number, number, Col][] = [];
-		let s = -1;
-		let c: Col = 'watch';
-		probs?.forEach((p, i) => {
-			const l = cut(p);
-			if (l && s < 0) ((s = i), (c = l));
-			else if (l === 'alert') c = 'alert';
-			else if (!l && s >= 0) (out.push([s * BIN, i * BIN, c]), (s = -1));
-		});
-		if (s >= 0) out.push([s * BIN, (probs?.length ?? 0) * BIN, c]);
-		return out;
-	}
+	const rows: { id: 'rotation' | 'water' | Hazard; label: string; hist: 'dry' | 'heat' | 'frost' | null }[] =
+		[
+			{ id: 'rotation', label: 'Rotation', hist: null },
+			{ id: 'water', label: 'Water', hist: null },
+			{ id: 'stress', label: 'Stress', hist: 'dry' },
+			{ id: 'heat', label: 'Heat', hist: 'heat' },
+			{ id: 'frost', label: 'Frost', hist: 'frost' }
+		];
 
-	const fcst = (id: string) =>
-		id === 'stress'
-			? bands(trace?.stress, (p) => (p < 0.15 ? null : p < 0.4 ? 'watch' : 'alert'))
-			: id === 'heat'
-				? bands(trace?.heat, (p) => (p > 0.1 ? 'alert' : null))
-				: bands(trace?.frost, (p) => (p > 0.05 ? 'alert' : null));
-
-	const canopyWin = (y: number): [number, number] | null => {
-		const a = trace?.canopy ?? [];
-		const w0 = Math.floor((y * YEAR) / BIN);
-		const w1 = Math.min(a.length, w0 + Math.ceil(YEAR / BIN));
-		let lo = -1;
-		let hi = -1;
-		for (let i = w0; i < w1; i++) if (a[i] > 0.2) (lo < 0 && (lo = i), (hi = i));
-		return lo < 0 ? null : [lo * BIN, Math.min((hi + 1) * BIN, (y + 1) * YEAR)];
-	};
-
-	const rows = [
-		{ id: 'rotation', label: 'Rotation', hist: null },
-		{ id: 'water', label: 'Water', hist: null },
-		{ id: 'stress', label: 'Stress', hist: 'dry' },
-		{ id: 'heat', label: 'Heat', hist: 'heat' },
-		{ id: 'frost', label: 'Frost', hist: 'frost' }
-	] as const;
+	$effect(() => {
+		const field = sel.field;
+		if (field && ui.cmp) for (const s of scen()) ensure(field, s);
+	});
 
 	let init = false;
 	$effect(() => {
@@ -70,6 +67,12 @@
 
 	const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize);
 	const setH = (v: number) => (h = clamp(v, H_MIN, H_MAX));
+
+	/** Content height in rem: header 2.25 + ruler 1.5 + rows 2 + group head 1.75 + lanes 2. */
+	const need = $derived(5.5 + rows.length * 2 + (ui.cmp ? lanes.length * 2 : 0));
+	$effect(() => {
+		if (need > h) setH(need);
+	});
 
 	function grabH(e: PointerEvent) {
 		y = e.clientY;
@@ -104,6 +107,21 @@
 	}
 </script>
 
+{#snippet strips(tr?: Trace)}
+	<div class="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col gap-1">
+		{#each HAZARDS as hid (hid)}
+			<div class="relative h-1.5">
+				{#each hazard(hid, tr) as [s, e, c] (s)}
+					<div
+						class="absolute inset-y-0 rounded-sm"
+						style="left: {x(hOff() + s, span)}%; width: {x(e - s, span)}%; background: {fill(c)}"
+					></div>
+				{/each}
+			</div>
+		{/each}
+	</div>
+{/snippet}
+
 <section
 	class="relative flex shrink-0 select-none flex-col border-t border-edge bg-panel"
 	style="height: {h}rem"
@@ -130,14 +148,50 @@
 		<span class="text-xs tabular-nums text-ink">{date}</span>
 	</header>
 
-	<div class="flex min-h-0 flex-1">
+	<div class="flex min-h-0 flex-1 items-start overflow-y-auto">
 		<div class="flex w-16 shrink-0 flex-col border-r border-edge">
-			<div class="h-6 border-b border-edge"></div>
+			<div class="h-6 shrink-0 border-b border-edge"></div>
 			{#each rows as row (row.id)}
-				<div class="flex h-8 items-center justify-center border-b border-edge last:border-b-0">
+				<div
+					class="flex h-8 shrink-0 items-center justify-center border-b border-edge last:border-b-0"
+				>
 					<span class="text-xs text-mute">{row.label}</span>
 				</div>
 			{/each}
+			<button
+				type="button"
+				aria-expanded={ui.cmp}
+				onclick={() => (ui.cmp = !ui.cmp)}
+				class="flex h-7 shrink-0 items-center gap-0.5 border-b border-edge px-1.5 text-left"
+				title="Compare scenarios"
+			>
+				<IconChevron
+					size={12}
+					stroke={2}
+					class="shrink-0 text-mute transition-transform duration-150 {ui.cmp
+						? ''
+						: '-rotate-90'}"
+				/>
+				<span class="truncate text-[0.625rem] text-mute">Scenario</span>
+			</button>
+			{#if ui.cmp}
+				{#each lanes as lane (lane.s)}
+					{@const on = sel.scenario === lane.s}
+					<button
+						type="button"
+						aria-pressed={on}
+						title="{lane.s}{lane.res?.status === 'error'
+							? ` · ${lane.res.detail ?? 'error'}`
+							: ''}"
+						onclick={() => (sel.scenario = lane.s)}
+						class="flex h-8 shrink-0 items-center border-b border-edge px-2 text-[0.625rem] capitalize transition-colors last:border-b-0 {on
+							? 'bg-raise text-ink'
+							: 'text-mute hover:text-ink'}"
+					>
+						<span class="truncate">{lane.s}</span>
+					</button>
+				{/each}
+			{/if}
 		</div>
 
 		<div
@@ -172,7 +226,7 @@
 				<div class="relative h-8 border-b border-edge last:border-b-0">
 					{#if row.id === 'rotation'}
 						{#each top?.rotation ?? [] as crop, y (y)}
-							{@const win = canopyWin(y)}
+							{@const win = canopy(trace?.canopy, y)}
 							<div
 								title="{crop} · year {y + 1}"
 								class="absolute top-1/2 flex h-5 -translate-y-1/2 items-center overflow-hidden rounded bg-raise px-1.5 text-[0.625rem] whitespace-nowrap text-ink"
@@ -230,7 +284,7 @@
 								></div>
 							{/each}
 						{/if}
-						{#each fcst(row.id) as [s, e, c] (s)}
+						{#each hazard(row.id, trace) as [s, e, c] (s)}
 							<div
 								title="{row.id} · predicted · {dayLabel(hOff() + s, hOff(), y0())} → {dayLabel(hOff() + e, hOff(), y0())}"
 								class="absolute top-1/2 h-5 -translate-y-1/2 rounded-sm border"
@@ -242,6 +296,23 @@
 					{/if}
 				</div>
 			{/each}
+
+			<div class="relative h-7 border-b border-edge">
+				{@render strips(trace)}
+			</div>
+			{#if ui.cmp}
+				{#each lanes as lane (lane.s)}
+					<div class="relative h-8 border-b border-edge last:border-b-0">
+						{#if lane.res === undefined}
+							<div
+								class="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 animate-pulse rounded-sm bg-raise"
+							></div>
+						{:else}
+							{@render strips(lane.tr)}
+						{/if}
+					</div>
+				{/each}
+			{/if}
 
 			{#if hOff()}
 				<div

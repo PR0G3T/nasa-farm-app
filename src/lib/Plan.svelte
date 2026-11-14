@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { METRICS, rec } from '#lib/farm.js';
-	import { cur, meta, recs, sel } from '#lib/state.svelte.js';
+	import { METRICS } from '#lib/farm.js';
+	import { cur, ensure, meta, scen, sel } from '#lib/state.svelte.js';
 
-	const scenarios = $derived(meta.scenarios.length ? meta.scenarios : ['baseline']);
+	const scenarios = $derived(scen());
 	const c = $derived(cur());
 	const best = $derived(c?.top?.[0]);
 	const pareto = $derived(c?.pareto?.length ?? 0);
@@ -15,15 +15,7 @@
 
 	$effect(() => {
 		const field = sel.field;
-		const scenario = sel.scenario;
-		if (!field || recs[field.id]?.[scenario]) return;
-		let live = true;
-		rec(field, scenario).then((r) => {
-			if (live) (recs[field.id] ??= {})[scenario] = r;
-		});
-		return () => {
-			live = false;
-		};
+		if (field) ensure(field, sel.scenario);
 	});
 </script>
 

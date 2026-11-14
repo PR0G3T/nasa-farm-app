@@ -1,3 +1,5 @@
+import type { Trace } from './farm.js';
+
 export const YEAR = 365;
 export const DAY_MS = 86400000;
 export const BIN = 7;
@@ -31,6 +33,48 @@ export const dayISO = (d: number, hOff: number, y0: number) => {
 		.toISOString()
 		.slice(0, 10);
 };
+
+export type Sev = 'watch' | 'alert' | 'mute';
+export type Seg = [start: number, end: number, sev: Sev];
+export type Hazard = 'stress' | 'heat' | 'frost';
+export const HAZARDS: Hazard[] = ['stress', 'heat', 'frost'];
+
+const CUT: Record<Hazard, (p: number) => Sev | null> = {
+	stress: (p) => (p < 0.15 ? null : p < 0.4 ? 'watch' : 'alert'),
+	heat: (p) => (p > 0.1 ? 'alert' : null),
+	frost: (p) => (p > 0.05 ? 'alert' : null)
+};
+
+/** Runs contiguous flagged bins into segments carrying the run's max severity. */
+export function bands(
+	probs: number[] | undefined,
+	cut: (p: number) => Sev | null
+): Seg[] {
+	const out: Seg[] = [];
+	let s = -1;
+	let c: Sev = 'watch';
+	probs?.forEach((p, i) => {
+		const l = cut(p);
+		if (l && s < 0) ((s = i), (c = l));
+		else if (l === 'alert') c = 'alert';
+		else if (!l && s >= 0) (out.push([s * BIN, i * BIN, c]), (s = -1));
+	});
+	if (s >= 0) out.push([s * BIN, (probs?.length ?? 0) * BIN, c]);
+	return out;
+}
+
+export const hazard = (id: Hazard, t?: Trace): Seg[] => bands(t?.[id], CUT[id]);
+
+/** Canopy window (days) within forecast year y where bins exceed coverage. */
+export function canopy(a: number[] | undefined, y: number): [number, number] | null {
+	if (!a) return null;
+	const w0 = Math.floor((y * YEAR) / BIN);
+	const w1 = Math.min(a.length, w0 + Math.ceil(YEAR / BIN));
+	let lo = -1;
+	let hi = -1;
+	for (let i = w0; i < w1; i++) if (a[i] > 0.2) (lo < 0 && (lo = i), (hi = i));
+	return lo < 0 ? null : [lo * BIN, Math.min((hi + 1) * BIN, (y + 1) * YEAR)];
+}
 
 export type Tick = { d: number; label?: string; major?: boolean };
 
