@@ -3,14 +3,14 @@
 	import IconSearch from '@tabler/icons-svelte-runes/icons/search';
 	import IconCollapse from '@tabler/icons-svelte-runes/icons/layout-sidebar-left-collapse';
 	import IconExpand from '@tabler/icons-svelte-runes/icons/layout-sidebar-left-expand';
-	import { fields, preview, sel, ui } from '#lib/state.svelte.js';
+	import { fields, find } from '#lib/data.js';
+	import { preview } from '#lib/geo.js';
+	import { sel, ui } from '#lib/state.svelte.js';
 
 	let collapsed = $state(false);
 	let query = $state('');
 
-	const list = $derived(
-		fields.filter((f) => f.name.toLowerCase().includes(query.trim().toLowerCase()))
-	);
+	const list = $derived(find(fields, query));
 </script>
 
 <aside
@@ -67,9 +67,9 @@
 					aria-current={selected ? 'true' : undefined}
 					title={collapsed ? field.name : undefined}
 					onclick={() => (sel.field = field)}
-					class="flex items-center gap-2.5 rounded-md px-2.5 text-left transition-colors {collapsed
-						? 'h-9'
-						: 'min-h-11 py-1.5'} {selected
+					class="row text-left {collapsed
+						? 'h-9 justify-center p-0'
+						: 'min-h-11 px-2.5 py-1.5'} {selected
 						? 'bg-raise text-ink'
 						: 'text-mute hover:bg-raise hover:text-ink'}"
 				>
@@ -82,6 +82,8 @@
 							src={preview(field)}
 							alt={field.name}
 							loading="lazy"
+							decoding="async"
+							draggable={false}
 							class="h-full w-full object-cover"
 						/>
 					</span>
@@ -107,7 +109,9 @@
 			type="button"
 			title={collapsed ? 'Settings' : undefined}
 			onclick={() => (ui.settings = true)}
-			class="flex h-9 items-center gap-2.5 rounded-md px-2.5 text-sm text-mute transition-colors hover:bg-raise hover:text-ink"
+			class="row h-9 text-sm text-mute hover:bg-raise hover:text-ink {collapsed
+				? 'justify-center p-0'
+				: 'px-2.5'}"
 		>
 			<IconSettings size={20} stroke={1.75} class="shrink-0" />
 			{#if !collapsed}

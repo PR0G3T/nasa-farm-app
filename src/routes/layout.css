@@ -59,6 +59,14 @@ html.dark {
 }
 
 @layer components {
+	.row {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		border-radius: 0.375rem;
+		transition: color 160ms, background-color 160ms;
+	}
+
 	dialog::backdrop {
 		background: oklch(0 0 0 / 40%);
 	}
@@ -101,7 +109,7 @@ html.dark {
 		border-top: 0.0625rem solid var(--color-edge);
 	}
 
-	.maplibregl-ctrl-group button > span {
+	html.dark .maplibregl-ctrl-group button > span {
 		filter: invert(0.92);
 	}
 

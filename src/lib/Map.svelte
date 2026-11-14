@@ -17,6 +17,44 @@
 
 	let map: MaplibreMap | undefined = $state();
 
+	const IDLE = 30_000;
+	const RATE = 6;
+
+	let raf = 0;
+	let idle: ReturnType<typeof setTimeout>;
+	let t0 = 0;
+	let b0 = 0;
+	let orbiting = false;
+
+	function frame(now: number) {
+		map?.jumpTo({ bearing: b0 + ((now - t0) / 1000) * RATE });
+		raf = requestAnimationFrame(frame);
+	}
+
+	function startOrbit() {
+		if (!map) return;
+		orbiting = true;
+		b0 = map.getBearing();
+		const field = sel.field;
+		map.easeTo({
+			...(field && { center: field.center }),
+			pitch: 55,
+			duration: 1500
+		});
+		t0 = performance.now();
+		raf = requestAnimationFrame(frame);
+	}
+
+	function touch() {
+		if (orbiting) {
+			orbiting = false;
+			cancelAnimationFrame(raf);
+			map?.easeTo({ pitch: 0, duration: 900 });
+		}
+		clearTimeout(idle);
+		idle = setTimeout(startOrbit, IDLE);
+	}
+
 	const style: StyleSpecification = {
 		version: 8,
 		sources: {},
@@ -33,9 +71,25 @@
 		const field = sel.field;
 		if (map && field) map.flyTo({ center: field.center, zoom: 12 });
 	});
+
+	$effect(() => {
+		touch();
+		return () => {
+			clearTimeout(idle);
+			cancelAnimationFrame(raf);
+		};
+	});
 </script>
 
-<MapLibre
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+	class="h-full w-full"
+	onpointerdown={touch}
+	onpointermove={(e) => e.buttons === 1 && touch()}
+	onwheel={touch}
+	ontouchstart={touch}
+>
+	<MapLibre
 	bind:map
 	{style}
 	center={[-95, 38]}
@@ -68,4 +122,5 @@
 	<FullScreenControl position="top-right" />
 	<ScaleControl position="bottom-left" />
 	<AttributionControl position="bottom-right" compact />
-</MapLibre>
+	</MapLibre>
+</div>

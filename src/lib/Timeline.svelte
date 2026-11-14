@@ -1,38 +1,25 @@
 <script lang="ts">
-	import { events, ui } from '#lib/state.svelte.js';
-	import type { Event } from '#lib/state.svelte.js';
+	import { events } from '#lib/data.js';
+	import { ui } from '#lib/state.svelte.js';
+	import {
+		DAYS,
+		H_HOME,
+		H_MAX,
+		H_MIN,
+		clamp,
+		dayAt,
+		dayLabel,
+		lanes,
+		months,
+		weeks,
+		x
+	} from '#lib/tl.js';
 
-	const START = Date.UTC(2026, 2, 1);
-	const DAYS = 245;
-	const DAY_MS = 86400000;
-
-	const months = [
-		{ label: 'Mar', d: 0 },
-		{ label: 'Apr', d: 31 },
-		{ label: 'May', d: 61 },
-		{ label: 'Jun', d: 92 },
-		{ label: 'Jul', d: 122 },
-		{ label: 'Aug', d: 153 },
-		{ label: 'Sep', d: 184 },
-		{ label: 'Oct', d: 214 }
-	];
-
-	const rows = $derived.by(() => {
-		const lanes: { evs: Event[]; end: number }[] = [];
-		for (const ev of events
-			.filter((e) => e.track === 'ops')
-			.toSorted((a, b) => a.start - b.start)) {
-			const lane =
-				lanes.find((l) => l.end + 2 <= ev.start) ??
-				lanes[lanes.push({ evs: [], end: -1 }) - 1];
-			lane.evs.push(ev);
-			lane.end = ev.end ?? ev.start;
-		}
-		return [
-			{ label: 'Imagery', evs: events.filter((e) => e.track === 'imagery') },
-			...lanes.map((l, i) => ({ label: i === 0 ? 'Alerts' : '', evs: l.evs }))
-		];
-	});
+	const rows = $derived([
+		{ label: 'Imagery', evs: events.filter((e) => e.track === 'imagery') },
+		...lanes(events.filter((e) => e.track === 'ops'))
+	]);
+	const date = $derived(dayLabel(ui.day));
 
 	const fills = {
 		low: 'bg-raise text-ink',
@@ -41,22 +28,13 @@
 	};
 	const marks = { low: 'bg-mute', watch: 'bg-warn', alert: 'bg-alert' };
 
-	const weeks = Array.from({ length: Math.floor(DAYS / 7) + 1 }, (_, i) => i * 7);
-
-	const x = (day: number) => (day / DAYS) * 100;
-	const date = $derived(
-		new Date(START + ui.day * DAY_MS).toLocaleDateString('en', {
-			month: 'short',
-			day: 'numeric'
-		})
-	);
-
 	let area: HTMLElement;
-	let h = $state(11);
+	let h = $state(H_HOME);
 	let y0 = 0;
-	let h0 = 11;
+	let h0 = H_HOME;
 
 	const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize);
+	const setH = (v: number) => (h = clamp(v, H_MIN, H_MAX));
 
 	function grabH(e: PointerEvent) {
 		y0 = e.clientY;
@@ -66,17 +44,17 @@
 	}
 
 	function dragH(e: PointerEvent) {
-		if (e.buttons === 1) h = Math.min(24, Math.max(8, h0 + (y0 - e.clientY) / rem()));
+		if (e.buttons === 1) setH(h0 + (y0 - e.clientY) / rem());
 	}
 
 	function sizeKeys(e: KeyboardEvent) {
-		if (e.key === 'ArrowUp') h = Math.min(24, h + 1);
-		if (e.key === 'ArrowDown') h = Math.max(8, h - 1);
+		if (e.key === 'ArrowUp') setH(h + 1);
+		if (e.key === 'ArrowDown') setH(h - 1);
 	}
 
 	function seek(e: PointerEvent) {
 		const { left, width } = area.getBoundingClientRect();
-		ui.day = Math.min(DAYS, Math.max(0, Math.round(((e.clientX - left) / width) * DAYS)));
+		ui.day = dayAt((e.clientX - left) / width);
 	}
 
 	function grab(e: PointerEvent) {
@@ -86,8 +64,8 @@
 
 	function step(e: KeyboardEvent) {
 		const d = e.shiftKey ? 7 : 1;
-		if (e.key === 'ArrowLeft') ui.day = Math.max(0, ui.day - d);
-		if (e.key === 'ArrowRight') ui.day = Math.min(DAYS, ui.day + d);
+		if (e.key === 'ArrowLeft') ui.day = clamp(ui.day - d, 0, DAYS);
+		if (e.key === 'ArrowRight') ui.day = clamp(ui.day + d, 0, DAYS);
 	}
 </script>
 
@@ -105,7 +83,7 @@
 		onpointerdown={grabH}
 		onpointermove={dragH}
 		onkeydown={sizeKeys}
-		ondblclick={() => (h = 11)}
+		ondblclick={() => setH(H_HOME)}
 		class="group absolute inset-x-0 -top-1 z-20 h-2 cursor-row-resize touch-none"
 	>
 		<div

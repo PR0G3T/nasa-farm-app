@@ -14,7 +14,9 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "wrangler types --check && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"gen": "wrangler types"
+		"gen": "wrangler types",
+		"test:unit": "vitest",
+		"test": "vitest run"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^5.20261114.1",
@@ -33,6 +35,7 @@
 		"tailwindcss": "^4.3.5",
 		"typescript": "6",
 		"vite": "^8.3.8",
+		"vitest": "^4.1.8",
 		"wrangler": "^4.162.0"
 	}
 }
