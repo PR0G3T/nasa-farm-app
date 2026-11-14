@@ -39,6 +39,22 @@ const CULTURES: Record<string, string> = {
 	PTC: 'Pomme de terre'
 };
 
+/** RPG culture code → model crop, for the current-practice marker. */
+const KIND: Record<string, string> = {
+	BDH: 'wheat',
+	BTH: 'wheat',
+	BDP: 'wheat',
+	ORH: 'wheat',
+	ORP: 'wheat',
+	MIS: 'maize',
+	MAI: 'maize',
+	LUZ: 'alfalfa',
+	JAC: 'fallow',
+	PPH: 'soybean',
+	FPH: 'soybean',
+	TTH: 'sorghum'
+};
+
 const close = (ring: [number, number][]) =>
 	ring[0][0] === ring.at(-1)![0] && ring[0][1] === ring.at(-1)![1] ? ring : [...ring, ring[0]];
 
@@ -78,6 +94,7 @@ export function parse(collection: FeatureCollection): Field[] {
 				id: String(properties.id_parcel ?? feature.id),
 				name: `P${properties.id_parcel ?? feature.id}`,
 				crop: CULTURES[properties.code_cultu as string] ?? properties.code_cultu ?? 'Autre',
+				kind: KIND[properties.code_cultu as string],
 				ha: properties.surf_parc,
 				center: centroid(ring),
 				ring

@@ -8,13 +8,6 @@ export type Trace = {
 	heat: number[];
 	frost: number[];
 };
-export type Entry = {
-	rotation: string[];
-	rank?: number | null;
-	score?: number;
-	trace?: Trace;
-	[key: string]: number | string[] | Trace | null | undefined;
-};
 export type Band = [number, number];
 export type History = {
 	y0: number;
@@ -24,64 +17,120 @@ export type History = {
 	frost: Band[];
 	sm?: number[];
 };
-export type SiteResult = {
+
+export type Site = {
 	status: 'ok' | 'error';
 	detail?: string;
-	plans_evaluated?: number;
-	scenarios?: number;
+	plans_evaluated: number;
+	scenarios: number;
+	/** (R, M) objective matrix — rows align with `rotations`. */
+	objectives: number[][];
+	pareto: number[];
+	ranking: number[];
+	scores: number[];
+	traces: Trace[];
 	history?: History;
-	pareto?: Entry[];
-	top?: Entry[];
 };
-export type PlanFile = {
+
+export type Result = {
+	site: Site;
+	columns: string[];
+	directions: number[];
+	rotations: string[][];
+};
+
+/** `plan.json` — lightweight index; per-field data lives in `plan/{id}.json`. */
+export type PlanIndex = {
 	version: string;
 	generated: string;
 	request: Record<string, unknown>;
-	fields: Record<string, { name?: string; crop?: string; ha?: number; history?: History }>;
-	scenarios: Record<string, { params: Parameters; fields: Record<string, SiteResult> }>;
+	columns: string[];
+	directions: number[];
+	rotations: string[][];
+	fields: Record<string, { name?: string; crop?: string; ha?: number }>;
+	scenarios: Record<string, { params: Parameters }>;
 };
 
-export const pick = (plan: PlanFile | null, id: string, scenario: string): SiteResult | null => {
-	const site = plan?.scenarios?.[scenario]?.fields?.[id];
-	return site ? { history: plan?.fields?.[id]?.history, ...site } : null;
+export type Shard = { history?: History; scenarios: Record<string, Site> };
+
+const empty: Site = {
+	status: 'error',
+	plans_evaluated: 0,
+	scenarios: 0,
+	objectives: [],
+	pareto: [],
+	ranking: [],
+	scores: [],
+	traces: []
 };
 
-export const parameters = (plan: PlanFile | null, scenario: string): Parameters =>
-	plan?.scenarios?.[scenario]?.params ?? {};
+export const site = (raw: Partial<Site> | null | undefined): Site => ({ ...empty, ...raw });
 
-export const names = (plan: PlanFile | null): string[] => (plan ? Object.keys(plan.scenarios) : []);
-
-let cache: PlanFile | null | undefined;
-export async function planFile(fetcher: typeof fetch): Promise<PlanFile | null> {
-	if (cache) return cache;
+let index: PlanIndex | null | undefined;
+export async function planFile(fetcher: typeof fetch): Promise<PlanIndex | null> {
+	if (index) return index;
 	const response = await fetcher('/plan.json').catch(() => null);
 	if (!response?.ok) return null;
-	return (cache = (await response.json()) as PlanFile);
+	return (index = (await response.json()) as PlanIndex);
 }
+
+const shards = new Map<string, Promise<Shard | null>>();
+export function shard(fetcher: typeof fetch, id: string): Promise<Shard | null> {
+	let pending = shards.get(id);
+	if (!pending) {
+		pending = fetcher(`/plan/${encodeURIComponent(id)}.json`)
+			.then((response) => (response.ok ? ((response.json()) as Promise<Shard>) : null))
+			.catch(() => null);
+		shards.set(id, pending);
+	}
+	return pending;
+}
+
+export const parameters = (plan: PlanIndex | null, scenario: string): Parameters =>
+	plan?.scenarios?.[scenario]?.params ?? {};
+
+export const names = (plan: PlanIndex | null): string[] =>
+	plan ? Object.keys(plan.scenarios) : [];
 
 export const METRICS: [key: string, label: string, unit: string][] = [
 	['yield_mean', 'Yield', 'kg/ha'],
 	['water_used', 'Water', 'mm'],
 	['stress_days', 'Stress', 'd'],
-	['soc_gain', 'Δ SOC', 'kg/ha']
+	['soc_gain', 'SOC', 'kg/ha']
 ];
 
-export async function recommend(field: Field, scenario: string): Promise<SiteResult> {
+export async function recommend(field: Field, scenario: string): Promise<Result> {
 	try {
 		const response = await fetch('/api/plan', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
 				id: field.id,
-				lat: field.center[1],
-				lon: field.center[0],
+				latitude: field.center[1],
+				longitude: field.center[0],
 				scenario
 			})
 		});
-		if (!response.ok) return { status: 'error', detail: `plan ${response.status}` };
-		const body = (await response.json()) as { results?: SiteResult[] };
-		return body.results?.[0] ?? { status: 'error', detail: 'empty result' };
+		if (!response.ok)
+			return { site: site({ detail: `plan ${response.status}` }), columns: [], directions: [], rotations: [] };
+		const body = (await response.json()) as {
+			results?: Partial<Site>[];
+			columns?: string[];
+			directions?: number[];
+			rotations?: string[][];
+		};
+		return {
+			site: site(body.results?.[0]),
+			columns: body.columns ?? [],
+			directions: body.directions ?? [],
+			rotations: body.rotations ?? []
+		};
 	} catch (error) {
-		return { status: 'error', detail: error instanceof Error ? error.message : 'network' };
+		return {
+			site: site({ detail: error instanceof Error ? error.message : 'network' }),
+			columns: [],
+			directions: [],
+			rotations: []
+		};
 	}
 }

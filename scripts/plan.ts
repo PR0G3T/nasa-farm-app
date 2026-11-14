@@ -1,4 +1,5 @@
-// Regenerate static/plan.json — parcels from apicarto → nasa-farm export.
+// Regenerate static/plan.json + static/plan/{id}.json — apicarto parcels
+// → nasa-farm export (index + per-field shards).
 // Usage: bun scripts/plan.ts [scenario[:k=v,...]]...
 // Default scenarios: baseline, warm (+2°C), dry (-20% precip).
 
@@ -19,8 +20,8 @@ const points = parse(await response.json()).map((field) => ({
 	name: field.name,
 	crop: field.crop,
 	ha: field.ha,
-	lat: field.center[1],
-	lon: field.center[0]
+	latitude: field.center[1],
+	longitude: field.center[0]
 }));
 console.log(`${points.length} parcels → ${scenarios.join(', ')}`);
 

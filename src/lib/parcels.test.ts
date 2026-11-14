@@ -64,6 +64,17 @@ describe('parse', () => {
 		expect(field.crop).toBe('ZZZ');
 	});
 
+	it('maps RPG codes to model crops for the current-practice marker', () => {
+		const [field] = parse(
+			collection([feature({ id_parcel: '4', surf_parc: 3, code_cultu: 'BTH' }, square(0, 0, 1))])
+		);
+		expect(field.kind).toBe('wheat');
+		const [other] = parse(
+			collection([feature({ id_parcel: '6', surf_parc: 2, code_cultu: 'BTN' }, square(0, 0, 1))])
+		);
+		expect(other.kind).toBeUndefined();
+	});
+
 	it('drops zero-surface and geometry-less features', () => {
 		expect(
 			parse(

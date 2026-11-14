@@ -21,7 +21,7 @@
 	import type { FeatureCollection } from 'geojson';
 	import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 	import { DEM, ESRI_IMAGERY, ESRI_REFERENCE, IMAGERY, PRODUCTS, bounds, gibs, mask, parcels } from '#lib/geography.js';
-	import { current, fields, historyOffset, selection, view, startYear } from '#lib/state.svelte.js';
+	import { current, fields, historyOffset, planIndex, selection, view, startYear } from '#lib/state.svelte.js';
 	import { active, dayISO } from '#lib/timeline.js';
 	import type { Severity } from '#lib/timeline.js';
 	import { untrack } from 'svelte';
@@ -109,8 +109,10 @@
 	const date = $derived(dayISO(view.day, historyOffset(), startYear()));
 	const selected = $derived(selection.field?.id ?? '');
 	const shade = $derived(selection.field ? mask(selection.field.ring) : null);
-	const top = $derived(current()?.status === 'ok' ? current()?.top?.[0] : undefined);
-	const now = $derived(active(view.day, historyOffset(), top?.trace, current()?.history));
+	const trace = $derived(
+		current()?.site.status === 'ok' ? current()?.site.traces[planIndex()] : undefined
+	);
+	const now = $derived(active(view.day, historyOffset(), trace, current()?.site.history));
 	const product = $derived(now ? PRODUCTS[now.id] : null);
 	const ring = $derived(
 		selection.field

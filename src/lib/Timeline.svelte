@@ -18,18 +18,25 @@
 		x
 	} from '#lib/timeline.js';
 	import type { Hazard } from '#lib/timeline.js';
+	import { planIndex } from '#lib/state.svelte.js';
 
-	const top = $derived(current()?.status === 'ok' ? current()?.top?.[0] : undefined);
-	const trace = $derived(top?.trace);
-	const history = $derived(current()?.history);
-	const years = $derived(top?.rotation.length ?? 1);
+	const trace = $derived(
+		current()?.site.status === 'ok' ? current()?.site.traces[planIndex()] : undefined
+	);
+	const rotation = $derived(current()?.rotations[planIndex()]);
+	const history = $derived(current()?.site.history);
+	const years = $derived(rotation?.length ?? 1);
 	const span = $derived(historyOffset() + years * YEAR);
 	const date = $derived(dayLabel(view.day, historyOffset(), startYear()));
 
 	const lanes = $derived(
 		scenarios().map((scenario) => {
 			const result = selection.field ? results[selection.field.id]?.[scenario] : undefined;
-			return { scenario, result, trace: result?.status === 'ok' ? result.top?.[0]?.trace : undefined };
+			return {
+				scenario,
+				result,
+				trace: result?.site.status === 'ok' ? result.site.traces[planIndex()] : undefined
+			};
 		})
 	);
 
@@ -231,8 +238,8 @@
 					<button
 						type="button"
 						aria-pressed={active}
-						title="{lane.scenario}{lane.result?.status === 'error'
-							? ` · ${lane.result.detail ?? 'error'}`
+						title="{lane.scenario}{lane.result?.site.status === 'error'
+							? ` · ${lane.result.site.detail ?? 'error'}`
 							: ''}"
 						onclick={() => (selection.scenario = lane.scenario)}
 						class="flex h-8 shrink-0 items-center border-b border-edge px-2 text-[0.625rem] capitalize transition-colors last:border-b-0 {active
@@ -276,7 +283,7 @@
 			{#each rows as row (row.id)}
 				<div class="relative h-8 border-b border-edge last:border-b-0">
 					{#if row.id === 'rotation'}
-						{#each top?.rotation ?? [] as crop, year (year)}
+						{#each rotation ?? [] as crop, year (year)}
 							{@const range = canopy(trace?.canopy, year)}
 							{@const detail = range
 								? `canopy ${stamp(historyOffset() + range[0])} → ${stamp(historyOffset() + range[1])}`

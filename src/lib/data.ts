@@ -2,6 +2,8 @@ export type Field = {
 	id: string;
 	name: string;
 	crop: string;
+	/** Model crop the parcel currently grows, when the RPG code maps to one. */
+	kind?: string;
 	ha: number;
 	center: [number, number];
 	ring: [number, number][];
