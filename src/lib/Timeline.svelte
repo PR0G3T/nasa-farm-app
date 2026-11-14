@@ -58,6 +58,11 @@
 		{ id: 'frost', label: 'Frost', hist: 'frost' }
 	] as const;
 
+	let init = false;
+	$effect(() => {
+		if (!init && hOff()) ((ui.day = hOff()), (init = true));
+	});
+
 	let area: HTMLElement;
 	let h = $state(H_HOME);
 	let y = 0;
@@ -183,21 +188,34 @@
 							</div>
 						{/each}
 					{:else if row.id === 'water'}
-						{#if trace}
+						{#if hist?.sm || trace}
 							<svg
 								class="absolute inset-0 h-full w-full"
 								viewBox="0 0 {span} 32"
 								preserveAspectRatio="none"
 								aria-hidden="true"
 							>
-								<path
-									d="M{hOff()} 32 {trace.water
-										.map((v, i) => `L${hOff() + i * BIN + BIN / 2} ${(1 - v) * 30 + 1}`)
-										.join(' ')} L{hOff() + trace.water.length * BIN} 32 Z"
-									class="fill-accent/20 stroke-accent"
-									stroke-width="1.5"
-									vector-effect="non-scaling-stroke"
-								/>
+								{#if hist?.sm?.length}
+									{@const sm = hist.sm}
+									<path
+										d="M0 32 {sm
+											.map((v, i) => `L${((i + 0.5) / sm.length) * hOff()} ${(1 - v) * 30 + 1}`)
+											.join(' ')} L{hOff()} 32 Z"
+										class="fill-mute/15 stroke-mute"
+										stroke-width="1"
+										vector-effect="non-scaling-stroke"
+									/>
+								{/if}
+								{#if trace}
+									<path
+										d="M{hOff()} 32 {trace.water
+											.map((v, i) => `L${hOff() + i * BIN + BIN / 2} ${(1 - v) * 30 + 1}`)
+											.join(' ')} L{hOff() + trace.water.length * BIN} 32 Z"
+										class="fill-accent/20 stroke-accent"
+										stroke-width="1.5"
+										vector-effect="non-scaling-stroke"
+									/>
+								{/if}
 							</svg>
 						{/if}
 					{:else}

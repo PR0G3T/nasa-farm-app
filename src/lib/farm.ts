@@ -16,7 +16,14 @@ export type Entry = {
 	[k: string]: number | string[] | Trace | null | undefined;
 };
 export type Band = [number, number];
-export type History = { y0: number; years: number; dry: Band[]; heat: Band[]; frost: Band[] };
+export type History = {
+	y0: number;
+	years: number;
+	dry: Band[];
+	heat: Band[];
+	frost: Band[];
+	sm?: number[];
+};
 export type SiteResult = {
 	status: 'ok' | 'error';
 	detail?: string;
@@ -30,12 +37,14 @@ export type PlanFile = {
 	version: string;
 	generated: string;
 	request: Record<string, unknown>;
-	fields: Record<string, { name?: string; crop?: string; ha?: number }>;
+	fields: Record<string, { name?: string; crop?: string; ha?: number; history?: History }>;
 	scenarios: Record<string, { params: Params; fields: Record<string, SiteResult> }>;
 };
 
-export const pick = (f: PlanFile | null, id: string, s: string): SiteResult | null =>
-	f?.scenarios?.[s]?.fields?.[id] ?? null;
+export const pick = (f: PlanFile | null, id: string, s: string): SiteResult | null => {
+	const r = f?.scenarios?.[s]?.fields?.[id];
+	return r ? { history: f?.fields?.[id]?.history, ...r } : null;
+};
 
 export const params = (f: PlanFile | null, s: string): Params =>
 	f?.scenarios?.[s]?.params ?? {};

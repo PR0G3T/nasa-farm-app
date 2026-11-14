@@ -24,9 +24,12 @@ const pts = parse(await res.json()).map((f) => ({
 }));
 console.log(`${pts.length} parcels → ${scenarios.join(', ')}`);
 
+const envFile = `${farm}/.env`;
 const proc = Bun.spawn(
 	[
-		'uv', 'run', '--directory', farm, 'nasa-farm', 'export',
+		'uv', 'run', '--directory', farm,
+		...(await Bun.file(envFile).exists() ? ['--env-file', envFile] : []),
+		'nasa-farm', 'export',
 		'--fields', '-', '--out', `${app}/static/plan.json`,
 		...scenarios.flatMap((s) => ['--scenario', s])
 	],
