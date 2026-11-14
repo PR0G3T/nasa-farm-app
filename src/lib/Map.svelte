@@ -20,9 +20,10 @@
 	import type { Map as MaplibreMap, MapLayerMouseEvent, StyleSpecification } from 'maplibre-gl';
 	import type { FeatureCollection } from 'geojson';
 	import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
-	import { DEM, ESRI_IMAGERY, ESRI_REFERENCE, bounds, gibs, mask, parcels } from '#lib/geography.js';
-	import { fields, historyOffset, selection, view, startYear } from '#lib/state.svelte.js';
-	import { dayISO } from '#lib/timeline.js';
+	import { DEM, ESRI_IMAGERY, ESRI_REFERENCE, IMAGERY, PRODUCTS, bounds, gibs, mask, parcels } from '#lib/geography.js';
+	import { current, fields, historyOffset, selection, view, startYear } from '#lib/state.svelte.js';
+	import { active, dayISO } from '#lib/timeline.js';
+	import type { Severity } from '#lib/timeline.js';
 	import { untrack } from 'svelte';
 
 	let map: MaplibreMap | undefined = $state.raw();
@@ -99,10 +100,32 @@
 	};
 
 	const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
+	const SEVERITY: Record<Severity, { color: string; opacity: number }> = {
+		alert: { color: '#fc4540', opacity: 0.95 },
+		watch: { color: '#ecaa0b', opacity: 0.8 },
+		mute: { color: '#808080', opacity: 0.65 }
+	};
 	const features = $derived(parcels(fields));
 	const date = $derived(dayISO(view.day, historyOffset(), startYear()));
 	const selected = $derived(selection.field?.id ?? '');
 	const shade = $derived(selection.field ? mask(selection.field.ring) : null);
+	const top = $derived(current()?.status === 'ok' ? current()?.top?.[0] : undefined);
+	const now = $derived(active(view.day, historyOffset(), top?.trace, current()?.history));
+	const product = $derived(now ? PRODUCTS[now.id] : null);
+	const ring = $derived(
+		selection.field
+			? ({
+					type: 'FeatureCollection',
+					features: [
+						{
+							type: 'Feature',
+							properties: {},
+							geometry: { type: 'Polygon', coordinates: [selection.field.ring] }
+						}
+					]
+				} as FeatureCollection)
+			: EMPTY
+	);
 	const picked = (id: string): ExpressionSpecification => ['==', ['get', 'id'], id];
 
 	function pick(event: MapLayerMouseEvent) {
@@ -133,7 +156,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-	class="h-full w-full"
+	class="relative h-full w-full"
 	onpointerdown={() => touch()}
 	onpointermove={(event) => event.buttons === 1 && touch()}
 	onpointerup={release}
@@ -160,9 +183,9 @@
 
 		<RasterTileSource
 			id="gibs"
-			tiles={[gibs(date)]}
+			tiles={[gibs(IMAGERY, date)]}
 			tileSize={256}
-			maxzoom={9}
+			maxzoom={IMAGERY.zoom}
 			attribution="NASA Global Imagery Browse Services"
 		>
 			<RasterLayer
@@ -175,6 +198,20 @@
 			source="elevation"
 			paint={{ 'hillshade-exaggeration': 0.25, 'hillshade-shadow-color': '#0a0a0a' }}
 		/>
+
+		{#if product && now}
+			{#key product.id}
+				<RasterTileSource
+					id="stress"
+					tiles={[gibs(product, date)]}
+					tileSize={256}
+					maxzoom={product.zoom}
+					attribution="NASA Global Imagery Browse Services"
+				>
+					<RasterLayer paint={{ 'raster-opacity': SEVERITY[now.severity].opacity }} />
+				</RasterTileSource>
+			{/key}
+		{/if}
 
 		<GeoJSONSource data={shade ?? EMPTY}>
 			<FillLayer
@@ -200,6 +237,18 @@
 				}}
 			/>
 		</GeoJSONSource>
+
+		{#if now}
+			<GeoJSONSource data={ring}>
+				<LineLayer
+					paint={{
+						'line-color': SEVERITY[now.severity].color,
+						'line-width': 3,
+						'line-blur': 0.5
+					}}
+				/>
+			</GeoJSONSource>
+		{/if}
 
 		<RasterTileSource tiles={[ESRI_REFERENCE]} tileSize={256}>
 			<RasterLayer />
@@ -242,4 +291,15 @@
 		<ScaleControl position="bottom-left" />
 		<AttributionControl position="bottom-right" compact />
 	</MapLibre>
+
+	{#if now && product}
+		<div
+			class="pointer-events-none absolute bottom-10 left-2 z-10 rounded-md border border-edge bg-panel px-2 py-1"
+		>
+			<p class="text-[0.625rem] font-medium whitespace-nowrap capitalize text-ink">
+				{now.id} · {now.severity} · {now.origin}
+			</p>
+			<p class="text-[0.625rem] whitespace-nowrap text-mute">{product.label} · {date}</p>
+		</div>
+	{/if}
 </div>

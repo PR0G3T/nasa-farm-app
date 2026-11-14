@@ -1,4 +1,4 @@
-import type { Trace } from './farm.js';
+import type { History, Trace } from './farm.js';
 
 export const YEAR = 365;
 export const DAY_MS = 86400000;
@@ -64,6 +64,39 @@ export function bands(
 }
 
 export const hazard = (id: Hazard, trace?: Trace): Segment[] => bands(trace?.[id], CUTOFF[id]);
+
+export type Active = { id: Hazard; severity: Severity; origin: 'observed' | 'predicted' };
+
+const RANK: Record<Severity, number> = { alert: 2, watch: 1, mute: 0 };
+const OBSERVED: [keyof Pick<History, 'dry' | 'heat' | 'frost'>, Hazard, Severity][] = [
+	['dry', 'stress', 'watch'],
+	['heat', 'heat', 'alert'],
+	['frost', 'frost', 'mute']
+];
+
+/** Strongest hazard covering `day`: observed bands before `offset`, predicted segments after. */
+export function active(
+	day: number,
+	offset: number,
+	trace: Trace | undefined,
+	history: History | undefined
+): Active | null {
+	let found: Active | null = null;
+	const keep = (next: Active) => {
+		if (!found || RANK[next.severity] > RANK[found.severity]) found = next;
+	};
+	if (day < offset) {
+		for (const [key, id, severity] of OBSERVED)
+			if (history?.[key]?.some(([start, end]) => day >= start && day < end))
+				keep({ id, severity, origin: 'observed' });
+	} else {
+		for (const id of HAZARDS)
+			for (const [start, end, severity] of hazard(id, trace))
+				if (day - offset >= start && day - offset < end)
+					keep({ id, severity, origin: 'predicted' });
+	}
+	return found;
+}
 
 /** Canopy window (days) within forecast year y where bins exceed coverage. */
 export function canopy(values: number[] | undefined, year: number): [number, number] | null {

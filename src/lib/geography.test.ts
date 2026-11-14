@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Field } from './data.js';
-import { bounds, gibs, mask, parcels, preview } from './geography.js';
+import { IMAGERY, PRODUCTS, bounds, gibs, mask, parcels, preview } from './geography.js';
 
 const RING: [number, number][] = [
 	[0, 0],
@@ -48,8 +48,16 @@ describe('preview', () => {
 
 describe('gibs', () => {
 	it('builds a NASA GIBS tile template for a date', () => {
-		expect(gibs('2026-06-15')).toBe(
+		expect(gibs(IMAGERY, '2026-06-15')).toBe(
 			'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/2026-06-15/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpeg'
+		);
+	});
+
+	it('maps each hazard to a dated satellite product', () => {
+		expect(gibs(PRODUCTS.stress, '2023-07-05')).toContain('/MODIS_Terra_L3_NDVI_16Day/');
+		expect(gibs(PRODUCTS.heat, '2023-07-05')).toContain('/MODIS_Aqua_Land_Surface_Temp_Day/');
+		expect(gibs(PRODUCTS.frost, '2023-07-05')).toContain(
+			'/MODIS_Aqua_Land_Surface_Temp_Night/'
 		);
 	});
 });

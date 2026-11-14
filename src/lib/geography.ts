@@ -1,5 +1,6 @@
 import type { FeatureCollection } from 'geojson';
 import type { Field } from './data.js';
+import type { Hazard } from './timeline.js';
 
 export const ESRI_IMAGERY =
 	'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -7,11 +8,44 @@ export const ESRI_REFERENCE =
 	'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 export const DEM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
 
-const GIBS_BASE =
-	'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default';
+const GIBS_BASE = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best';
 
-export function gibs(date: string): string {
-	return `${GIBS_BASE}/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpeg`;
+export type Product = { id: string; label: string; matrix: string; format: string; zoom: number };
+
+export const IMAGERY: Product = {
+	id: 'MODIS_Terra_CorrectedReflectance_TrueColor',
+	label: 'True color',
+	matrix: 'GoogleMapsCompatible_Level9',
+	format: 'jpeg',
+	zoom: 9
+};
+
+export const PRODUCTS: Record<Hazard, Product> = {
+	stress: {
+		id: 'MODIS_Terra_L3_NDVI_16Day',
+		label: 'NDVI',
+		matrix: 'GoogleMapsCompatible_Level9',
+		format: 'png',
+		zoom: 9
+	},
+	heat: {
+		id: 'MODIS_Aqua_Land_Surface_Temp_Day',
+		label: 'LST day',
+		matrix: 'GoogleMapsCompatible_Level7',
+		format: 'png',
+		zoom: 7
+	},
+	frost: {
+		id: 'MODIS_Aqua_Land_Surface_Temp_Night',
+		label: 'LST night',
+		matrix: 'GoogleMapsCompatible_Level7',
+		format: 'png',
+		zoom: 7
+	}
+};
+
+export function gibs(product: Product, date: string): string {
+	return `${GIBS_BASE}/${product.id}/default/${date}/${product.matrix}/{z}/{y}/{x}.${product.format}`;
 }
 
 const SPAN = 0.015;

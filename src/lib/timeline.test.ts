@@ -5,6 +5,7 @@ import {
 	HEIGHT_MAX,
 	HEIGHT_MIN,
 	YEAR,
+	active,
 	bands,
 	canopy,
 	clamp,
@@ -17,7 +18,7 @@ import {
 	ticks,
 	x
 } from './timeline.js';
-import type { Trace } from './farm.js';
+import type { History, Trace } from './farm.js';
 
 const OFFSET = 2 * YEAR; // 2 observed years
 const ORIGIN = 2023;
@@ -162,6 +163,69 @@ describe('hazard', () => {
 	it('tolerates a missing trace or channel', () => {
 		expect(hazard('stress', undefined)).toEqual([]);
 		expect(hazard('heat', trace({}))).toEqual([]);
+	});
+});
+
+describe('active', () => {
+	const trace = (patch: Partial<Trace>): Trace => ({
+		canopy: [],
+		water: [],
+		stress: [],
+		heat: [],
+		frost: [],
+		...patch
+	});
+	const history = (patch: Partial<History>): History => ({
+		y0: ORIGIN,
+		years: 2,
+		dry: [],
+		heat: [],
+		frost: [],
+		...patch
+	});
+
+	it('returns null without data or outside bands', () => {
+		expect(active(10, OFFSET, undefined, undefined)).toBeNull();
+		expect(active(10, OFFSET, trace({}), history({}))).toBeNull();
+	});
+
+	it('resolves observed bands before the offset with fixed severities', () => {
+		const past = history({ dry: [[3, 11]], heat: [[3, 11]], frost: [[40, 50]] });
+		expect(active(5, OFFSET, undefined, past)).toEqual({
+			id: 'heat',
+			severity: 'alert',
+			origin: 'observed'
+		});
+		expect(active(45, OFFSET, undefined, past)).toEqual({
+			id: 'frost',
+			severity: 'mute',
+			origin: 'observed'
+		});
+		expect(active(11, OFFSET, undefined, past)).toBeNull();
+	});
+
+	it('resolves predicted segments after the offset from the trace', () => {
+		const future = trace({ stress: [0.5, 0, 0], heat: [0, 0.2, 0] });
+		expect(active(OFFSET + 1, OFFSET, future, undefined)).toEqual({
+			id: 'stress',
+			severity: 'alert',
+			origin: 'predicted'
+		});
+		expect(active(OFFSET + BIN + 1, OFFSET, future, undefined)).toEqual({
+			id: 'heat',
+			severity: 'alert',
+			origin: 'predicted'
+		});
+		expect(active(OFFSET + 2 * BIN + 1, OFFSET, future, undefined)).toBeNull();
+	});
+
+	it('keeps the highest severity when hazards overlap', () => {
+		const future = trace({ stress: [0.2], frost: [0.2] });
+		expect(active(OFFSET, OFFSET, future, undefined)).toEqual({
+			id: 'frost',
+			severity: 'alert',
+			origin: 'predicted'
+		});
 	});
 });
 
