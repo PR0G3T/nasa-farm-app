@@ -3,7 +3,7 @@
 // Default scenarios: baseline, warm (+2°C), dry (-20% precip).
 
 import { fileURLToPath } from 'node:url';
-import { parse, url } from '../src/lib/rpg.ts';
+import { parse, url } from '../src/lib/parcels.ts';
 
 const app = fileURLToPath(new URL('..', import.meta.url));
 const farm = fileURLToPath(new URL('../../nasa-farm', import.meta.url));

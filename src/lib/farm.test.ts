@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { names, params, pick, rec } from './farm.js';
+import { names, parameters, pick, recommend } from './farm.js';
 import type { PlanFile } from './farm.js';
 
 const file: PlanFile = {
@@ -26,10 +26,10 @@ describe('plan file helpers', () => {
 		expect(pick(null, 'P1', 'baseline')).toBeNull();
 	});
 
-	it('params returns scenario overrides, {} when absent', () => {
-		expect(params(file, 'warm')).toEqual({ delta_t: 2 });
-		expect(params(file, 'missing')).toEqual({});
-		expect(params(null, 'warm')).toEqual({});
+	it('parameters returns scenario overrides, {} when absent', () => {
+		expect(parameters(file, 'warm')).toEqual({ delta_t: 2 });
+		expect(parameters(file, 'missing')).toEqual({});
+		expect(parameters(null, 'warm')).toEqual({});
 	});
 
 	it('names lists scenario keys in order', () => {
@@ -38,7 +38,7 @@ describe('plan file helpers', () => {
 	});
 });
 
-describe('rec', () => {
+describe('recommend', () => {
 	afterEach(() => vi.unstubAllGlobals());
 
 	const field = {
@@ -56,7 +56,7 @@ describe('rec', () => {
 			new Response(JSON.stringify({ results: [site] }), { status: 200 })
 		);
 		vi.stubGlobal('fetch', spy);
-		expect(await rec(field, 'warm')).toEqual(site);
+		expect(await recommend(field, 'warm')).toEqual(site);
 		const [u, init] = spy.mock.calls[0];
 		expect(u).toBe('/api/plan');
 		expect(JSON.parse(init.body)).toEqual({
@@ -69,11 +69,11 @@ describe('rec', () => {
 
 	it('degrades to status error on http failure', async () => {
 		vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('x', { status: 503 })));
-		expect((await rec(field, 'baseline')).status).toBe('error');
+		expect((await recommend(field, 'baseline')).status).toBe('error');
 	});
 
 	it('degrades to status error on network failure', async () => {
 		vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('down')));
-		expect((await rec(field, 'baseline')).detail).toBe('down');
+		expect((await recommend(field, 'baseline')).detail).toBe('down');
 	});
 });

@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { FARM_API } from '$app/env/private';
-import { params as scenarioParams, pick, planFile } from '#lib/farm.js';
+import { parameters as scenarioParams, pick, planFile } from '#lib/farm.js';
 import type { RequestHandler } from './$types';
 
 type Body = { id?: unknown; lat?: unknown; lon?: unknown; scenario?: unknown };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FeatureCollection } from 'geojson';
-import { centroid, parse, url } from './rpg.js';
+import { centroid, parse, url } from './parcels.js';
 
 const square = (x: number, y: number, s: number): [number, number][] => [
 	[x, y],

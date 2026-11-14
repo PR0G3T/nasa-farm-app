@@ -4,7 +4,7 @@
 	import IconMoon from '@tabler/icons-svelte-runes/icons/moon';
 	import IconDeviceDesktop from '@tabler/icons-svelte-runes/icons/device-desktop';
 	import { setMode, userPrefersMode } from 'mode-watcher';
-	import { ui } from '#lib/state.svelte.js';
+	import { view } from '#lib/state.svelte.js';
 	import type { Icon } from '@tabler/icons-svelte-runes';
 
 	let dlg: HTMLDialogElement;
@@ -16,7 +16,7 @@
 	];
 
 	$effect(() => {
-		if (ui.settings) dlg.showModal();
+		if (view.settings) dlg.showModal();
 		else dlg.close();
 	});
 </script>
@@ -24,7 +24,7 @@
 <dialog
 	bind:this={dlg}
 	closedby="any"
-	onclose={() => (ui.settings = false)}
+	onclose={() => (view.settings = false)}
 	onclick={(e) => e.target === dlg && dlg.close()}
 	class="m-auto w-96 rounded-xl border border-edge bg-panel p-0 text-ink shadow-2xl"
 >

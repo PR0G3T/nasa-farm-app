@@ -20,9 +20,9 @@
 	import type { Map as MaplibreMap, MapLayerMouseEvent, StyleSpecification } from 'maplibre-gl';
 	import type { FeatureCollection } from 'geojson';
 	import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
-	import { DEM, ESRI_IMG, ESRI_REF, bounds, gibs, mask, parcels } from '#lib/geo.js';
-	import { fields, hOff, sel, ui, y0 } from '#lib/state.svelte.js';
-	import { dayISO } from '#lib/tl.js';
+	import { DEM, ESRI_IMG, ESRI_REF, bounds, gibs, mask, parcels } from '#lib/geography.js';
+	import { fields, historyOffset, selection, view, startYear } from '#lib/state.svelte.js';
+	import { dayISO } from '#lib/timeline.js';
 	import { untrack } from 'svelte';
 
 	let map: MaplibreMap | undefined = $state.raw();
@@ -45,7 +45,7 @@
 		if (!map) return;
 		orbiting = true;
 		b0 = map.getBearing();
-		const field = sel.field;
+		const field = selection.field;
 		map.easeTo({
 			...(field && { center: field.center }),
 			pitch: 55,
@@ -100,15 +100,15 @@
 
 	const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 	const fc = $derived(parcels(fields));
-	const iso = $derived(dayISO(ui.day, hOff(), y0()));
-	const selId = $derived(sel.field?.id ?? '');
-	const dim = $derived(sel.field ? mask(sel.field.ring) : null);
+	const iso = $derived(dayISO(view.day, historyOffset(), startYear()));
+	const selId = $derived(selection.field?.id ?? '');
+	const dim = $derived(selection.field ? mask(selection.field.ring) : null);
 	const picked = (id: string): ExpressionSpecification => ['==', ['get', 'id'], id];
 
 	function pick(e: MapLayerMouseEvent) {
 		const id = e.features?.[0]?.properties?.id;
 		const field = fields.find((f) => f.id === id);
-		if (field) sel.field = field;
+		if (field) selection.field = field;
 	}
 
 	const cursor = (v: string) => () => {
@@ -116,7 +116,7 @@
 	};
 
 	$effect(() => {
-		const field = sel.field;
+		const field = selection.field;
 		untrack(() => {
 			if (field) map?.fitBounds(bounds(field.ring), { padding: 80, maxZoom: 15 });
 		});
@@ -166,7 +166,7 @@
 			attribution="NASA Global Imagery Browse Services"
 		>
 			<RasterLayer
-				layout={{ visibility: ui.nasa ? 'visible' : 'none' }}
+				layout={{ visibility: view.nasa ? 'visible' : 'none' }}
 				paint={{ 'raster-opacity': 0.9 }}
 			/>
 		</RasterTileSource>
@@ -231,10 +231,10 @@
 		<CustomControl position="top-right" group>
 			<button
 				type="button"
-				onclick={() => (ui.nasa = !ui.nasa)}
-				aria-pressed={ui.nasa}
+				onclick={() => (view.nasa = !view.nasa)}
+				aria-pressed={view.nasa}
 				title="NASA daily imagery (timeline date)"
-				class="grid place-items-center {ui.nasa ? 'text-accent' : 'text-ink'}"
+				class="grid place-items-center {view.nasa ? 'text-accent' : 'text-ink'}"
 			>
 				<IconSatellite size={18} stroke={1.75} />
 			</button>

@@ -1,6 +1,6 @@
 import { FARM_API } from '$app/env/private';
 import { names, planFile } from '#lib/farm.js';
-import { parse, url } from '#lib/rpg.js';
+import { parse, url } from '#lib/parcels.js';
 import type { PageServerLoad } from './$types';
 
 const parcels = async (fetcher: typeof fetch) => {

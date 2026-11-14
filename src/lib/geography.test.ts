@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Field } from './data.js';
-import { bounds, gibs, mask, parcels, preview } from './geo.js';
+import { bounds, gibs, mask, parcels, preview } from './geography.js';
 
 const RING: [number, number][] = [
 	[0, 0],

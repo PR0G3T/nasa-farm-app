@@ -16,7 +16,7 @@ import {
 	month,
 	ticks,
 	x
-} from './tl.js';
+} from './timeline.js';
 import type { Trace } from './farm.js';
 
 const H = 2 * YEAR; // 2 observed years

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Field } from './data.js';
-import { ensure, meta, recs, scen } from './state.svelte.js';
+import { ensure, meta, results, scenarios } from './state.svelte.js';
 
 const field: Field = { id: 'P1', name: 'P1', crop: 'Blé', ha: 4.2, center: [1.61, 48.2], ring: [] };
 
@@ -8,20 +8,20 @@ const ok = (body: unknown) =>
 	new Response(JSON.stringify({ results: [body] }), { status: 200 });
 
 beforeEach(() => {
-	for (const id of Object.keys(recs)) delete recs[id];
+	for (const id of Object.keys(results)) delete results[id];
 	meta.scenarios = [];
 });
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('scen', () => {
+describe('scenarios', () => {
 	it('falls back to baseline while metadata is empty', () => {
-		expect(scen()).toEqual(['baseline']);
+		expect(scenarios()).toEqual(['baseline']);
 	});
 
 	it('returns the scenario list once loaded', () => {
 		meta.scenarios = ['baseline', 'warm', 'dry'];
-		expect(scen()).toEqual(['baseline', 'warm', 'dry']);
+		expect(scenarios()).toEqual(['baseline', 'warm', 'dry']);
 	});
 });
 
@@ -31,7 +31,7 @@ describe('ensure', () => {
 		const spy = vi.fn().mockResolvedValue(ok(site));
 		vi.stubGlobal('fetch', spy);
 		await ensure(field, 'warm');
-		expect(recs.P1.warm).toEqual(site);
+		expect(results.P1.warm).toEqual(site);
 		expect(spy).toHaveBeenCalledTimes(1);
 	});
 
@@ -55,6 +55,6 @@ describe('ensure', () => {
 		vi.stubGlobal('fetch', spy);
 		await Promise.all([ensure(field, 'warm'), ensure(field, 'dry')]);
 		expect(spy).toHaveBeenCalledTimes(2);
-		expect(Object.keys(recs.P1).sort()).toEqual(['dry', 'warm']);
+		expect(Object.keys(results.P1).sort()).toEqual(['dry', 'warm']);
 	});
 });

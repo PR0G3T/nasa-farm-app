@@ -1,6 +1,6 @@
 import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { Field } from './data.js';
-import { shoelace } from './geo.js';
+import { shoelace } from './geography.js';
 
 const YEAR = 2024;
 const MAX = 40;

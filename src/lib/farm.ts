@@ -1,6 +1,6 @@
 import type { Field } from './data.js';
 
-export type Params = Record<string, number>;
+export type Parameters = Record<string, number>;
 export type Trace = {
 	canopy: number[];
 	water: number[];
@@ -13,7 +13,7 @@ export type Entry = {
 	rank?: number | null;
 	score?: number;
 	trace?: Trace;
-	[k: string]: number | string[] | Trace | null | undefined;
+	[key: string]: number | string[] | Trace | null | undefined;
 };
 export type Band = [number, number];
 export type History = {
@@ -38,25 +38,25 @@ export type PlanFile = {
 	generated: string;
 	request: Record<string, unknown>;
 	fields: Record<string, { name?: string; crop?: string; ha?: number; history?: History }>;
-	scenarios: Record<string, { params: Params; fields: Record<string, SiteResult> }>;
+	scenarios: Record<string, { params: Parameters; fields: Record<string, SiteResult> }>;
 };
 
-export const pick = (f: PlanFile | null, id: string, s: string): SiteResult | null => {
-	const r = f?.scenarios?.[s]?.fields?.[id];
-	return r ? { history: f?.fields?.[id]?.history, ...r } : null;
+export const pick = (plan: PlanFile | null, id: string, scenario: string): SiteResult | null => {
+	const site = plan?.scenarios?.[scenario]?.fields?.[id];
+	return site ? { history: plan?.fields?.[id]?.history, ...site } : null;
 };
 
-export const params = (f: PlanFile | null, s: string): Params =>
-	f?.scenarios?.[s]?.params ?? {};
+export const parameters = (plan: PlanFile | null, scenario: string): Parameters =>
+	plan?.scenarios?.[scenario]?.params ?? {};
 
-export const names = (f: PlanFile | null): string[] => (f ? Object.keys(f.scenarios) : []);
+export const names = (plan: PlanFile | null): string[] => (plan ? Object.keys(plan.scenarios) : []);
 
 let cache: PlanFile | null | undefined;
 export async function planFile(fetcher: typeof fetch): Promise<PlanFile | null> {
 	if (cache) return cache;
-	const res = await fetcher('/plan.json').catch(() => null);
-	if (!res?.ok) return null;
-	return (cache = (await res.json()) as PlanFile);
+	const response = await fetcher('/plan.json').catch(() => null);
+	if (!response?.ok) return null;
+	return (cache = (await response.json()) as PlanFile);
 }
 
 export const METRICS: [key: string, label: string, unit: string][] = [
@@ -66,9 +66,9 @@ export const METRICS: [key: string, label: string, unit: string][] = [
 	['soc_gain', 'Δ SOC', 'kg/ha']
 ];
 
-export async function rec(field: Field, scenario: string): Promise<SiteResult> {
+export async function recommend(field: Field, scenario: string): Promise<SiteResult> {
 	try {
-		const res = await fetch('/api/plan', {
+		const response = await fetch('/api/plan', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify({
@@ -78,10 +78,10 @@ export async function rec(field: Field, scenario: string): Promise<SiteResult> {
 				scenario
 			})
 		});
-		if (!res.ok) return { status: 'error', detail: `plan ${res.status}` };
-		const body = (await res.json()) as { results?: SiteResult[] };
+		if (!response.ok) return { status: 'error', detail: `plan ${response.status}` };
+		const body = (await response.json()) as { results?: SiteResult[] };
 		return body.results?.[0] ?? { status: 'error', detail: 'empty result' };
-	} catch (e) {
-		return { status: 'error', detail: e instanceof Error ? e.message : 'network' };
+	} catch (error) {
+		return { status: 'error', detail: error instanceof Error ? error.message : 'network' };
 	}
 }

@@ -1,13 +1,13 @@
 <script lang="ts">
 	import IconChevron from '@tabler/icons-svelte-runes/icons/chevron-down';
 	import type { Trace } from '#lib/farm.js';
-	import { cur, ensure, hOff, recs, scen, sel, ui, y0 } from '#lib/state.svelte.js';
+	import { current, ensure, historyOffset, results, scenarios, selection, view, startYear } from '#lib/state.svelte.js';
 	import {
 		BIN,
 		HAZARDS,
-		H_HOME,
-		H_MAX,
-		H_MIN,
+		HEIGHT_HOME,
+		HEIGHT_MAX,
+		HEIGHT_MIN,
 		YEAR,
 		canopy,
 		clamp,
@@ -16,156 +16,156 @@
 		hazard,
 		ticks,
 		x
-	} from '#lib/tl.js';
-	import type { Hazard } from '#lib/tl.js';
+	} from '#lib/timeline.js';
+	import type { Hazard } from '#lib/timeline.js';
 
-	const top = $derived(cur()?.status === 'ok' ? cur()?.top?.[0] : undefined);
+	const top = $derived(current()?.status === 'ok' ? current()?.top?.[0] : undefined);
 	const trace = $derived(top?.trace);
-	const hist = $derived(cur()?.history);
-	const fYears = $derived(top?.rotation.length ?? 1);
-	const span = $derived(hOff() + fYears * YEAR);
-	const date = $derived(dayLabel(ui.day, hOff(), y0()));
+	const history = $derived(current()?.history);
+	const years = $derived(top?.rotation.length ?? 1);
+	const span = $derived(historyOffset() + years * YEAR);
+	const date = $derived(dayLabel(view.day, historyOffset(), startYear()));
 
 	const lanes = $derived(
-		scen().map((s) => {
-			const res = sel.field ? recs[sel.field.id]?.[s] : undefined;
-			return { s, res, tr: res?.status === 'ok' ? res.top?.[0]?.trace : undefined };
+		scenarios().map((scenario) => {
+			const result = selection.field ? results[selection.field.id]?.[scenario] : undefined;
+			return { scenario, result, trace: result?.status === 'ok' ? result.top?.[0]?.trace : undefined };
 		})
 	);
 
-	const COL = {
+	const COLORS = {
 		watch: '--color-warn',
 		alert: '--color-alert',
 		mute: '--color-mute',
 		accent: '--color-accent'
 	} as const;
-	type Col = keyof typeof COL;
+	type Color = keyof typeof COLORS;
 
-	const stripe = (c: Col) =>
-		`repeating-linear-gradient(-45deg, var(${COL[c]}) 0 0.1875rem, color-mix(in oklab, var(${COL[c]}) 18%, transparent) 0.1875rem 0.5rem)`;
-	const mini = (c: Col) =>
-		`repeating-linear-gradient(-45deg, var(${COL[c]}) 0 0.125rem, color-mix(in oklab, var(${COL[c]}) 22%, transparent) 0.125rem 0.375rem)`;
-	const veil = (c: Col) =>
-		`repeating-linear-gradient(-45deg, color-mix(in oklab, var(${COL[c]}) 32%, transparent) 0 0.1875rem, color-mix(in oklab, var(${COL[c]}) 10%, transparent) 0.1875rem 0.5rem)`;
-	const solid = (c: Col) => `color-mix(in oklab, var(${COL[c]}) 45%, transparent)`;
+	const stripe = (key: Color) =>
+		`repeating-linear-gradient(-45deg, var(${COLORS[key]}) 0 0.1875rem, color-mix(in oklab, var(${COLORS[key]}) 18%, transparent) 0.1875rem 0.5rem)`;
+	const mini = (key: Color) =>
+		`repeating-linear-gradient(-45deg, var(${COLORS[key]}) 0 0.125rem, color-mix(in oklab, var(${COLORS[key]}) 22%, transparent) 0.125rem 0.375rem)`;
+	const veil = (key: Color) =>
+		`repeating-linear-gradient(-45deg, color-mix(in oklab, var(${COLORS[key]}) 32%, transparent) 0 0.1875rem, color-mix(in oklab, var(${COLORS[key]}) 10%, transparent) 0.1875rem 0.5rem)`;
+	const solid = (key: Color) => `color-mix(in oklab, var(${COLORS[key]}) 45%, transparent)`;
 
 	const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize);
-	const dl = (d: number) => dayLabel(d, hOff(), y0());
+	const stamp = (day: number) => dayLabel(day, historyOffset(), startYear());
 
-	type Tip = { x: number; y0: number; y1: number; head: string; sub: string };
+	type Tip = { x: number; top: number; bottom: number; title: string; detail: string };
 	let tip = $state<Tip | null>(null);
 
-	function tipOn(e: PointerEvent, head: string, sub: string) {
-		if (e.buttons) return;
-		const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-		tip = { x: r.left + r.width / 2, y0: r.top, y1: r.bottom, head, sub };
+	function tipOn(event: PointerEvent, title: string, detail: string) {
+		if (event.buttons) return;
+		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		tip = { x: rect.left + rect.width / 2, top: rect.top, bottom: rect.bottom, title, detail };
 	}
 	const tipOff = () => (tip = null);
 	const tipX = $derived(
 		tip ? Math.min(Math.max(tip.x, 4 * rem()), window.innerWidth - 4 * rem()) : 0
 	);
-	const tipUp = $derived(tip !== null && tip.y0 > 4.5 * rem());
+	const tipUp = $derived(tip !== null && tip.top > 4.5 * rem());
 
-	const wPts = $derived(
+	const points = $derived(
 		(trace?.water ?? []).map(
-			(v, i) => [hOff() + i * BIN + BIN / 2, (1 - v) * 30 + 1] as const
+			(value, index) => [historyOffset() + index * BIN + BIN / 2, (1 - value) * 30 + 1] as const
 		)
 	);
-	const wLine = $derived(
-		wPts.length ? `M${wPts.map((p) => p.join(' ')).join(' L')}` : ''
+	const path = $derived(
+		points.length ? `M${points.map((point) => point.join(' ')).join(' L')}` : ''
 	);
-	const wClip = $derived(
-		wPts.length
-			? `polygon(${x(wPts[0][0], span)}% 100%, ${wPts
-					.map((p) => `${x(p[0], span)}% ${(p[1] / 32) * 100}%`)
-					.join(', ')}, ${x(wPts[wPts.length - 1][0], span)}% 100%)`
+	const clip = $derived(
+		points.length
+			? `polygon(${x(points[0][0], span)}% 100%, ${points
+					.map((point) => `${x(point[0], span)}% ${(point[1] / 32) * 100}%`)
+					.join(', ')}, ${x(points[points.length - 1][0], span)}% 100%)`
 			: 'none'
 	);
 
 	type Row = {
 		id: 'rotation' | 'water' | Hazard;
 		label: string;
-		hist: 'dry' | 'heat' | 'frost' | null;
+		hazard: 'dry' | 'heat' | 'frost' | null;
 	};
 	const rows: Row[] = [
-		{ id: 'rotation', label: 'Rotation', hist: null },
-		{ id: 'water', label: 'Water', hist: null },
-		{ id: 'stress', label: 'Stress', hist: 'dry' },
-		{ id: 'heat', label: 'Heat', hist: 'heat' },
-		{ id: 'frost', label: 'Frost', hist: 'frost' }
+		{ id: 'rotation', label: 'Rotation', hazard: null },
+		{ id: 'water', label: 'Water', hazard: null },
+		{ id: 'stress', label: 'Stress', hazard: 'dry' },
+		{ id: 'heat', label: 'Heat', hazard: 'heat' },
+		{ id: 'frost', label: 'Frost', hazard: 'frost' }
 	];
 
 	$effect(() => {
-		const field = sel.field;
-		if (field && ui.cmp) for (const s of scen()) ensure(field, s);
+		const field = selection.field;
+		if (field && view.compare) for (const scenario of scenarios()) ensure(field, scenario);
 	});
 
-	let init = false;
+	let initialized = false;
 	$effect(() => {
-		if (!init && hOff()) ((ui.day = hOff()), (init = true));
+		if (!initialized && historyOffset()) ((view.day = historyOffset()), (initialized = true));
 	});
 
 	let area: HTMLElement;
-	let h = $state(H_HOME);
-	let y = 0;
-	let h0 = H_HOME;
+	let height = $state(HEIGHT_HOME);
+	let anchor = 0;
+	let held = HEIGHT_HOME;
 
-	const setH = (v: number) => (h = clamp(v, H_MIN, H_MAX));
+	const resize = (value: number) => (height = clamp(value, HEIGHT_MIN, HEIGHT_MAX));
 
 	/** Content height in rem: header 2.25 + ruler 1.5 + rows 2 + group head 1.75 + lanes 2. */
-	const need = $derived(5.5 + rows.length * 2 + (ui.cmp ? lanes.length * 2 : 0));
+	const need = $derived(5.5 + rows.length * 2 + (view.compare ? lanes.length * 2 : 0));
 	$effect(() => {
-		if (need > h) setH(need);
+		if (need > height) resize(need);
 	});
 
-	function grabH(e: PointerEvent) {
-		y = e.clientY;
-		h0 = h;
-		e.currentTarget instanceof HTMLElement &&
-			e.currentTarget.setPointerCapture(e.pointerId);
+	function press(event: PointerEvent) {
+		anchor = event.clientY;
+		held = height;
+		event.currentTarget instanceof HTMLElement &&
+			event.currentTarget.setPointerCapture(event.pointerId);
 	}
 
-	function dragH(e: PointerEvent) {
-		if (e.buttons === 1) setH(h0 + (y - e.clientY) / rem());
+	function pull(event: PointerEvent) {
+		if (event.buttons === 1) resize(held + (anchor - event.clientY) / rem());
 	}
 
-	function sizeKeys(e: KeyboardEvent) {
-		if (e.key === 'ArrowUp') setH(h + 1);
-		if (e.key === 'ArrowDown') setH(h - 1);
+	function sizeKeys(event: KeyboardEvent) {
+		if (event.key === 'ArrowUp') resize(height + 1);
+		if (event.key === 'ArrowDown') resize(height - 1);
 	}
 
-	function seek(e: PointerEvent) {
+	function seek(event: PointerEvent) {
 		const { left, width } = area.getBoundingClientRect();
-		ui.day = dayAt((e.clientX - left) / width, span);
+		view.day = dayAt((event.clientX - left) / width, span);
 	}
 
-	function grab(e: PointerEvent) {
+	function grab(event: PointerEvent) {
 		tip = null;
-		area.setPointerCapture(e.pointerId);
-		seek(e);
+		area.setPointerCapture(event.pointerId);
+		seek(event);
 	}
 
-	function step(e: KeyboardEvent) {
-		const d = e.shiftKey ? BIN : 1;
-		if (e.key === 'ArrowLeft') ui.day = clamp(ui.day - d, 0, span);
-		if (e.key === 'ArrowRight') ui.day = clamp(ui.day + d, 0, span);
+	function step(event: KeyboardEvent) {
+		const delta = event.shiftKey ? BIN : 1;
+		if (event.key === 'ArrowLeft') view.day = clamp(view.day - delta, 0, span);
+		if (event.key === 'ArrowRight') view.day = clamp(view.day + delta, 0, span);
 	}
 </script>
 
-{#snippet strips(tr: Trace | undefined, label: string)}
+{#snippet strips(trace: Trace | undefined, label: string)}
 	<div class="absolute inset-x-0 top-1/2 flex -translate-y-1/2 flex-col gap-1">
-		{#each HAZARDS as hid (hid)}
+		{#each HAZARDS as kind (kind)}
 			<div class="relative h-1.5">
-				{#each hazard(hid, tr) as [s, e, c] (s)}
-					{@const lab = `${label} · ${hid} · ${c} · ${dl(hOff() + s)} → ${dl(hOff() + e)}`}
+				{#each hazard(kind, trace) as [start, end, color] (start)}
+					{@const caption = `${label} · ${kind} · ${color} · ${stamp(historyOffset() + start)} → ${stamp(historyOffset() + end)}`}
 					<div
 						role="img"
-						aria-label={lab}
-						onpointerenter={(ev) =>
-							tipOn(ev, `${label} · ${hid} · ${c}`, `${dl(hOff() + s)} → ${dl(hOff() + e)}`)}
+						aria-label={caption}
+						onpointerenter={(event) =>
+							tipOn(event, `${label} · ${kind} · ${color}`, `${stamp(historyOffset() + start)} → ${stamp(historyOffset() + end)}`)}
 						onpointerleave={tipOff}
 						class="absolute inset-y-0 rounded-sm"
-						style="left: {x(hOff() + s, span)}%; width: {x(e - s, span)}%; background-image: {mini(c)}"
+						style="left: {x(historyOffset() + start, span)}%; width: {x(end - start, span)}%; background-image: {mini(color)}"
 					></div>
 				{/each}
 			</div>
@@ -175,19 +175,19 @@
 
 <section
 	class="relative flex shrink-0 select-none flex-col border-t border-edge bg-panel"
-	style="height: {h}rem"
+	style="height: {height}rem"
 >
 	<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 	<div
 		role="separator"
 		aria-orientation="horizontal"
 		aria-label="Resize timeline"
-		aria-valuenow={h}
+		aria-valuenow={height}
 		tabindex="0"
-		onpointerdown={grabH}
-		onpointermove={dragH}
+		onpointerdown={press}
+		onpointermove={pull}
 		onkeydown={sizeKeys}
-		ondblclick={() => setH(H_HOME)}
+		ondblclick={() => resize(HEIGHT_HOME)}
 		class="group absolute inset-x-0 -top-1 z-20 h-2 cursor-row-resize touch-none"
 	>
 		<div
@@ -211,35 +211,35 @@
 			{/each}
 			<button
 				type="button"
-				aria-expanded={ui.cmp}
-				onclick={() => (ui.cmp = !ui.cmp)}
+				aria-expanded={view.compare}
+				onclick={() => (view.compare = !view.compare)}
 				class="flex h-7 shrink-0 items-center gap-0.5 border-b border-edge px-1.5 text-left"
 				title="Compare scenarios"
 			>
 				<IconChevron
 					size={12}
 					stroke={2}
-					class="shrink-0 text-mute transition-transform duration-150 {ui.cmp
+					class="shrink-0 text-mute transition-transform duration-150 {view.compare
 						? ''
 						: '-rotate-90'}"
 				/>
 				<span class="truncate text-[0.625rem] text-mute">Scenario</span>
 			</button>
-			{#if ui.cmp}
-				{#each lanes as lane (lane.s)}
-					{@const on = sel.scenario === lane.s}
+			{#if view.compare}
+				{#each lanes as lane (lane.scenario)}
+					{@const active = selection.scenario === lane.scenario}
 					<button
 						type="button"
-						aria-pressed={on}
-						title="{lane.s}{lane.res?.status === 'error'
-							? ` · ${lane.res.detail ?? 'error'}`
+						aria-pressed={active}
+						title="{lane.scenario}{lane.result?.status === 'error'
+							? ` · ${lane.result.detail ?? 'error'}`
 							: ''}"
-						onclick={() => (sel.scenario = lane.s)}
-						class="flex h-8 shrink-0 items-center border-b border-edge px-2 text-[0.625rem] capitalize transition-colors last:border-b-0 {on
+						onclick={() => (selection.scenario = lane.scenario)}
+						class="flex h-8 shrink-0 items-center border-b border-edge px-2 text-[0.625rem] capitalize transition-colors last:border-b-0 {active
 							? 'bg-raise text-ink'
 							: 'text-mute hover:text-ink'}"
 					>
-						<span class="truncate">{lane.s}</span>
+						<span class="truncate">{lane.scenario}</span>
 					</button>
 				{/each}
 			{/if}
@@ -251,23 +251,23 @@
 			aria-label="Timeline"
 			aria-valuemin={0}
 			aria-valuemax={span}
-			aria-valuenow={ui.day}
+			aria-valuenow={view.day}
 			tabindex="0"
 			onpointerdown={grab}
-			onpointermove={(e) => e.buttons === 1 && seek(e)}
+			onpointermove={(event) => event.buttons === 1 && seek(event)}
 			onkeydown={step}
 			class="relative flex-1 touch-none"
 		>
 			<div class="relative h-6 border-b border-edge">
-				{#each ticks(span, hOff(), y0()) as t (t.d)}
+				{#each ticks(span, historyOffset(), startYear()) as tick (tick.day)}
 					<div
-						class="absolute bottom-0 w-px {t.major ? 'h-2.5 bg-mute' : 'h-1.5 bg-mute/40'}"
-						style="left: {x(t.d, span)}%"
+						class="absolute bottom-0 w-px {tick.major ? 'h-2.5 bg-mute' : 'h-1.5 bg-mute/40'}"
+						style="left: {x(tick.day, span)}%"
 					></div>
-					{#if t.label}
+					{#if tick.label}
 						<span
 							class="absolute bottom-2 pl-1 text-[0.625rem] leading-none text-mute"
-							style="left: {x(t.d, span)}%">{t.label}</span
+							style="left: {x(tick.day, span)}%">{tick.label}</span
 						>
 					{/if}
 				{/each}
@@ -276,56 +276,56 @@
 			{#each rows as row (row.id)}
 				<div class="relative h-8 border-b border-edge last:border-b-0">
 					{#if row.id === 'rotation'}
-						{#each top?.rotation ?? [] as crop, y (y)}
-							{@const win = canopy(trace?.canopy, y)}
-							{@const sub = win
-								? `canopy ${dl(hOff() + win[0])} → ${dl(hOff() + win[1])}`
+						{#each top?.rotation ?? [] as crop, year (year)}
+							{@const range = canopy(trace?.canopy, year)}
+							{@const detail = range
+								? `canopy ${stamp(historyOffset() + range[0])} → ${stamp(historyOffset() + range[1])}`
 								: 'planned'}
 							<div
 								role="img"
-								aria-label="{crop} · Y{y + 1} · {sub}"
-								onpointerenter={(ev) => tipOn(ev, `${crop} · Y${y + 1}`, sub)}
+								aria-label="{crop} · Y{year + 1} · {detail}"
+								onpointerenter={(event) => tipOn(event, `${crop} · Y${year + 1}`, detail)}
 								onpointerleave={tipOff}
 								class="pred absolute top-1/2 flex h-5 -translate-y-1/2 items-center overflow-hidden rounded bg-raise px-1.5 text-[0.625rem] whitespace-nowrap text-ink"
-								style="left: {x(hOff() + y * YEAR, span)}%; width: {x(YEAR, span)}%"
+								style="left: {x(historyOffset() + year * YEAR, span)}%; width: {x(YEAR, span)}%"
 							>
 								{crop}
-								{#if win}
+								{#if range}
 									<div
 										class="pred absolute bottom-0 h-1 bg-accent/60"
-										style="left: {x(win[0] - y * YEAR, YEAR)}%; width: {x(win[1] - win[0], YEAR)}%"
+										style="left: {x(range[0] - year * YEAR, YEAR)}%; width: {x(range[1] - range[0], YEAR)}%"
 									></div>
 								{/if}
 							</div>
 						{/each}
 					{:else if row.id === 'water'}
-						{#if wPts.length}
+						{#if points.length}
 							<div
 								class="absolute inset-0"
-								style="clip-path: {wClip}; background-image: {veil('accent')}"
+								style="clip-path: {clip}; background-image: {veil('accent')}"
 							></div>
 						{/if}
-						{#if hist?.sm || trace}
+						{#if history?.sm || trace}
 							<svg
 								class="absolute inset-0 h-full w-full"
 								viewBox="0 0 {span} 32"
 								preserveAspectRatio="none"
 								aria-hidden="true"
 							>
-								{#if hist?.sm?.length}
-									{@const sm = hist.sm}
+								{#if history?.sm?.length}
+									{@const moisture = history.sm}
 									<path
-										d="M0 32 {sm
-											.map((v, i) => `L${((i + 0.5) / sm.length) * hOff()} ${(1 - v) * 30 + 1}`)
-											.join(' ')} L{hOff()} 32 Z"
+										d="M0 32 {moisture
+											.map((value, index) => `L${((index + 0.5) / moisture.length) * historyOffset()} ${(1 - value) * 30 + 1}`)
+											.join(' ')} L{historyOffset()} 32 Z"
 										class="fill-mute/15 stroke-mute"
 										stroke-width="1"
 										vector-effect="non-scaling-stroke"
 									/>
 								{/if}
-								{#if wLine}
+								{#if path}
 									<path
-										d={wLine}
+										d={path}
 										fill="none"
 										class="stroke-accent"
 										stroke-width="1.5"
@@ -335,32 +335,32 @@
 							</svg>
 						{/if}
 					{:else}
-						{#if hist && row.hist}
-							{#each hist[row.hist] as [s, e] (s)}
+						{#if history && row.hazard}
+							{#each history[row.hazard] as [start, end] (start)}
 								<div
 									role="img"
-									aria-label="{row.label} · observed · {dl(s)} → {dl(e)}"
-									onpointerenter={(ev) =>
-										tipOn(ev, `${row.label} · observed`, `${dl(s)} → ${dl(e)}`)}
+									aria-label="{row.label} · observed · {stamp(start)} → {stamp(end)}"
+									onpointerenter={(event) =>
+										tipOn(event, `${row.label} · observed`, `${stamp(start)} → ${stamp(end)}`)}
 									onpointerleave={tipOff}
 									class="absolute top-1/2 h-5 -translate-y-1/2 rounded-sm"
-									style="left: {x(s, span)}%; width: {x(e - s, span)}%; background: {solid(
+									style="left: {x(start, span)}%; width: {x(end - start, span)}%; background: {solid(
 										row.id === 'stress' ? 'watch' : row.id === 'heat' ? 'alert' : 'mute'
 									)}"
 								></div>
 							{/each}
 						{/if}
-						{#each hazard(row.id, trace) as [s, e, c] (s)}
+						{#each hazard(row.id, trace) as [start, end, color] (start)}
 							<div
 								role="img"
-								aria-label="{row.label} · predicted · {c} · {dl(hOff() + s)} → {dl(hOff() + e)}"
-								onpointerenter={(ev) =>
-									tipOn(ev, `${row.label} · predicted · ${c}`, `${dl(hOff() + s)} → ${dl(hOff() + e)}`)}
+								aria-label="{row.label} · predicted · {color} · {stamp(historyOffset() + start)} → {stamp(historyOffset() + end)}"
+								onpointerenter={(event) =>
+									tipOn(event, `${row.label} · predicted · ${color}`, `${stamp(historyOffset() + start)} → ${stamp(historyOffset() + end)}`)}
 								onpointerleave={tipOff}
 								class="absolute top-1/2 h-5 -translate-y-1/2 rounded-sm border"
-								style="left: {x(hOff() + s, span)}%; width: {x(e - s, span)}%; background-image: {stripe(
-									c
-								)}; border-color: color-mix(in oklab, var({COL[c]}) 50%, transparent)"
+								style="left: {x(historyOffset() + start, span)}%; width: {x(end - start, span)}%; background-image: {stripe(
+									color
+								)}; border-color: color-mix(in oklab, var({COLORS[color]}) 50%, transparent)"
 							></div>
 						{/each}
 					{/if}
@@ -368,31 +368,31 @@
 			{/each}
 
 			<div class="relative h-7 border-b border-edge">
-				{@render strips(trace, sel.scenario)}
+				{@render strips(trace, selection.scenario)}
 			</div>
-			{#if ui.cmp}
-				{#each lanes as lane (lane.s)}
+			{#if view.compare}
+				{#each lanes as lane (lane.scenario)}
 					<div class="relative h-8 border-b border-edge last:border-b-0">
-						{#if lane.res === undefined}
+						{#if lane.result === undefined}
 							<div
 								class="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 animate-pulse rounded-sm bg-raise"
 							></div>
 						{:else}
-							{@render strips(lane.tr, lane.s)}
+							{@render strips(lane.trace, lane.scenario)}
 						{/if}
 					</div>
 				{/each}
 			{/if}
 
-			{#if hOff()}
+			{#if historyOffset()}
 				<div
 					class="pointer-events-none absolute inset-y-0 z-10 w-px bg-ink/50"
-					style="left: {x(hOff(), span)}%"
+					style="left: {x(historyOffset(), span)}%"
 				></div>
 			{/if}
 			<div
 				class="pointer-events-none absolute inset-y-0 z-10 w-px bg-accent"
-				style="left: {x(Math.min(ui.day, span), span)}%"
+				style="left: {x(Math.min(view.day, span), span)}%"
 			>
 				<div
 					class="absolute -left-1 top-0 size-2.5 rounded-sm bg-accent"
@@ -408,10 +408,10 @@
 			class="pointer-events-none fixed z-50 -translate-x-1/2 rounded-md border border-edge bg-panel px-2 py-1 shadow-lg {tipUp
 				? '-translate-y-full'
 				: ''}"
-			style="left: {tipX}px; top: {tipUp ? tip.y0 - 6 : tip.y1 + 6}px"
+			style="left: {tipX}px; top: {tipUp ? tip.top - 6 : tip.bottom + 6}px"
 		>
-			<p class="capitalize text-[0.625rem] font-medium whitespace-nowrap text-ink">{tip.head}</p>
-			<p class="text-[0.625rem] whitespace-nowrap text-mute">{tip.sub}</p>
+			<p class="capitalize text-[0.625rem] font-medium whitespace-nowrap text-ink">{tip.title}</p>
+			<p class="text-[0.625rem] whitespace-nowrap text-mute">{tip.detail}</p>
 		</div>
 	{/if}
 </section>

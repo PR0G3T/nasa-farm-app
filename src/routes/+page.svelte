@@ -4,7 +4,7 @@
 	import Settings from '#lib/Settings.svelte';
 	import Sidebar from '#lib/Sidebar.svelte';
 	import Timeline from '#lib/Timeline.svelte';
-	import { fields, meta, sel } from '#lib/state.svelte.js';
+	import { fields, meta, selection } from '#lib/state.svelte.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -17,10 +17,10 @@
 			meta.scenarios.some((s, i) => s !== scenarios[i])
 		)
 			meta.scenarios = scenarios;
-		if (scenarios.length && !scenarios.includes(sel.scenario)) sel.scenario = scenarios[0];
+		if (scenarios.length && !scenarios.includes(selection.scenario)) selection.scenario = scenarios[0];
 		if (fields.length) return;
 		fields.push(...list);
-		sel.field ??= fields[0];
+		selection.field ??= fields[0];
 	});
 </script>
 

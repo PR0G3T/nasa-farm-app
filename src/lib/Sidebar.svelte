@@ -4,8 +4,8 @@
 	import IconCollapse from '@tabler/icons-svelte-runes/icons/layout-sidebar-left-collapse';
 	import IconExpand from '@tabler/icons-svelte-runes/icons/layout-sidebar-left-expand';
 	import { find } from '#lib/data.js';
-	import { preview } from '#lib/geo.js';
-	import { fields, sel, ui } from '#lib/state.svelte.js';
+	import { preview } from '#lib/geography.js';
+	import { fields, selection, view } from '#lib/state.svelte.js';
 
 	let collapsed = $state(false);
 	let query = $state('');
@@ -61,12 +61,12 @@
 
 		<nav class="flex flex-col gap-0.5">
 			{#each list as field (field.id)}
-				{@const selected = sel.field?.id === field.id}
+				{@const selected = selection.field?.id === field.id}
 				<button
 					type="button"
 					aria-current={selected ? 'true' : undefined}
 					title={collapsed ? field.name : undefined}
-					onclick={() => (sel.field = field)}
+					onclick={() => (selection.field = field)}
 					class="row text-left {collapsed
 						? 'h-9 justify-center p-0'
 						: 'min-h-11 px-2.5 py-1.5'} {selected
@@ -108,7 +108,7 @@
 		<button
 			type="button"
 			title={collapsed ? 'Settings' : undefined}
-			onclick={() => (ui.settings = true)}
+			onclick={() => (view.settings = true)}
 			class="row h-9 text-sm text-mute hover:bg-raise hover:text-ink {collapsed
 				? 'justify-center p-0'
 				: 'px-2.5'}"
