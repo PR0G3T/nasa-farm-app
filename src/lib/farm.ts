@@ -1,7 +1,13 @@
 import type { Field } from './data.js';
 
 export type Params = Record<string, number>;
-export type Trace = { canopy: number[]; water: number[]; stress: number[]; frost: number[] };
+export type Trace = {
+	canopy: number[];
+	water: number[];
+	stress: number[];
+	heat: number[];
+	frost: number[];
+};
 export type Entry = {
 	rotation: string[];
 	rank?: number | null;
@@ -9,11 +15,14 @@ export type Entry = {
 	trace?: Trace;
 	[k: string]: number | string[] | Trace | null | undefined;
 };
+export type Band = [number, number];
+export type History = { y0: number; years: number; dry: Band[]; heat: Band[]; frost: Band[] };
 export type SiteResult = {
 	status: 'ok' | 'error';
 	detail?: string;
 	plans_evaluated?: number;
 	scenarios?: number;
+	history?: History;
 	pareto?: Entry[];
 	top?: Entry[];
 };

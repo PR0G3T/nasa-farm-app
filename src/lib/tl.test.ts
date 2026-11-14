@@ -15,6 +15,9 @@ import {
 	x
 } from './tl.js';
 
+const H = 2 * YEAR; // 2 observed years
+const Y0 = 2023;
+
 describe('x', () => {
 	it('maps days to percentages of the span', () => {
 		expect(x(0, YEAR)).toBe(0);
@@ -45,29 +48,28 @@ describe('dayAt', () => {
 });
 
 describe('ticks', () => {
-	it('labels one major tick per year', () => {
-		const majors = ticks(3 * YEAR).filter((t) => t.major);
-		expect(majors.map((t) => t.label)).toEqual(['Y1', 'Y2', 'Y3']);
+	it('labels history years then forecast years', () => {
+		const majors = ticks(H + 3 * YEAR, H, Y0).filter((t) => t.major);
+		expect(majors.map((t) => t.label)).toEqual(['2023', '2024', 'Y1', 'Y2', 'Y3']);
 	});
 
 	it('is strictly increasing and in range', () => {
-		const ts = ticks(3 * YEAR);
-		for (const t of ts) expect(t.d).toBeLessThanOrEqual(3 * YEAR);
+		const span = H + 3 * YEAR;
+		const ts = ticks(span, H, Y0);
+		for (const t of ts) expect(t.d).toBeLessThanOrEqual(span);
 		for (let i = 1; i < ts.length; i++) expect(ts[i].d).toBeGreaterThan(ts[i - 1].d);
 	});
 });
 
 describe('dayLabel', () => {
-	it('formats day 0 as year 1 January 1', () => {
-		expect(dayLabel(0)).toBe('Y1 · Jan 1');
+	it('labels history days with the real year', () => {
+		expect(dayLabel(0, H, Y0)).toBe('2023 · Jan 1');
+		expect(dayLabel(YEAR, H, Y0)).toBe('2024 · Jan 1');
 	});
 
-	it('rolls into the next year at the boundary', () => {
-		expect(dayLabel(YEAR)).toBe('Y2 · Jan 1');
-	});
-
-	it('formats any in-range day without crashing', () => {
-		expect(dayLabel(3 * YEAR)).toBeTruthy();
+	it('labels forecast days with the plan year', () => {
+		expect(dayLabel(H, H, Y0)).toBe('Y1 · Jan 1');
+		expect(dayLabel(H + YEAR, H, Y0)).toBe('Y2 · Jan 1');
 	});
 });
 
@@ -82,16 +84,16 @@ describe('calendar', () => {
 });
 
 describe('dayISO', () => {
-	it('returns a real past-or-today ISO date', () => {
-		const today = new Date().toISOString().slice(0, 10);
-		for (const d of [0, 100, YEAR, 2 * YEAR + 30]) {
-			expect(dayISO(d)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-			expect(dayISO(d) <= today).toBe(true);
-		}
+	it('maps history days to their real dates', () => {
+		expect(dayISO(0, H, Y0)).toBe('2023-01-01');
+		expect(dayISO(YEAR + 31, H, Y0)).toBe('2024-02-01');
 	});
 
-	it('maps sim days to the same doy of the current year', () => {
-		const y = new Date().getUTCFullYear();
-		expect(dayISO(YEAR + 31)).toBe(`${y}-02-01`);
+	it('returns a real past-or-today date for forecast days', () => {
+		const today = new Date().toISOString().slice(0, 10);
+		for (const d of [H, H + 100, H + 2 * YEAR + 30]) {
+			expect(dayISO(d, H, Y0)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			expect(dayISO(d, H, Y0) <= today).toBe(true);
+		}
 	});
 });

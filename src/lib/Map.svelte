@@ -21,7 +21,7 @@
 	import type { FeatureCollection } from 'geojson';
 	import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 	import { DEM, ESRI_IMG, ESRI_REF, bounds, gibs, mask, parcels } from '#lib/geo.js';
-	import { fields, sel, ui } from '#lib/state.svelte.js';
+	import { fields, hOff, sel, ui, y0 } from '#lib/state.svelte.js';
 	import { dayISO } from '#lib/tl.js';
 	import { untrack } from 'svelte';
 
@@ -100,7 +100,7 @@
 
 	const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 	const fc = $derived(parcels(fields));
-	const iso = $derived(dayISO(ui.day));
+	const iso = $derived(dayISO(ui.day, hOff(), y0()));
 	const selId = $derived(sel.field?.id ?? '');
 	const dim = $derived(sel.field ? mask(sel.field.ring) : null);
 	const picked = (id: string): ExpressionSpecification => ['==', ['get', 'id'], id];

@@ -12,3 +12,6 @@ export const meta = $state<{ scenarios: string[]; live: boolean }>({
 	live: false
 });
 export const ui = $state({ settings: false, day: 180, nasa: false });
+export const cur = () => (sel.field ? recs[sel.field.id]?.[sel.scenario] : undefined);
+export const hOff = () => (cur()?.history?.years ?? 0) * 365;
+export const y0 = () => cur()?.history?.y0 ?? new Date().getUTCFullYear();

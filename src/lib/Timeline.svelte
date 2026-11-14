@@ -1,16 +1,44 @@
 <script lang="ts">
-	import { recs, sel, ui } from '#lib/state.svelte.js';
+	import { cur, hOff, ui, y0 } from '#lib/state.svelte.js';
 	import { BIN, H_HOME, H_MAX, H_MIN, YEAR, clamp, dayAt, dayLabel, ticks, x } from '#lib/tl.js';
 
-	const cur = $derived(sel.field ? recs[sel.field.id]?.[sel.scenario] : undefined);
-	const top = $derived(cur?.status === 'ok' ? cur?.top?.[0] : undefined);
+	const top = $derived(cur()?.status === 'ok' ? cur()?.top?.[0] : undefined);
 	const trace = $derived(top?.trace);
-	const span = $derived((top?.rotation.length ?? 1) * YEAR);
-	const date = $derived(dayLabel(ui.day));
+	const hist = $derived(cur()?.history);
+	const fYears = $derived(top?.rotation.length ?? 1);
+	const span = $derived(hOff() + fYears * YEAR);
+	const date = $derived(dayLabel(ui.day, hOff(), y0()));
 
-	const stressLevel = (p: number): 'watch' | 'alert' | null =>
-		p < 0.05 ? null : p < 0.35 ? 'watch' : 'alert';
-	const stressFill = { watch: 'fill-warn', alert: 'fill-alert' } as const;
+	const COL = { watch: '--color-warn', alert: '--color-alert', mute: '--color-mute' } as const;
+	type Col = keyof typeof COL;
+
+	const stripe = (c: Col) =>
+		`repeating-linear-gradient(-45deg, var(${COL[c]}) 0 0.1875rem, color-mix(in oklab, var(${COL[c]}) 18%, transparent) 0.1875rem 0.5rem)`;
+	const solid = (c: Col) => `color-mix(in oklab, var(${COL[c]}) 45%, transparent)`;
+
+	function bands(
+		probs: number[] | undefined,
+		cut: (p: number) => Col | null
+	): [number, number, Col][] {
+		const out: [number, number, Col][] = [];
+		let s = -1;
+		let c: Col = 'watch';
+		probs?.forEach((p, i) => {
+			const l = cut(p);
+			if (l && s < 0) ((s = i), (c = l));
+			else if (l === 'alert') c = 'alert';
+			else if (!l && s >= 0) (out.push([s * BIN, i * BIN, c]), (s = -1));
+		});
+		if (s >= 0) out.push([s * BIN, (probs?.length ?? 0) * BIN, c]);
+		return out;
+	}
+
+	const fcst = (id: string) =>
+		id === 'stress'
+			? bands(trace?.stress, (p) => (p < 0.15 ? null : p < 0.4 ? 'watch' : 'alert'))
+			: id === 'heat'
+				? bands(trace?.heat, (p) => (p > 0.1 ? 'alert' : null))
+				: bands(trace?.frost, (p) => (p > 0.05 ? 'alert' : null));
 
 	const canopyWin = (y: number): [number, number] | null => {
 		const a = trace?.canopy ?? [];
@@ -23,29 +51,30 @@
 	};
 
 	const rows = [
-		{ id: 'rotation', label: 'Rotation' },
-		{ id: 'water', label: 'Water' },
-		{ id: 'stress', label: 'Stress' },
-		{ id: 'frost', label: 'Frost' }
+		{ id: 'rotation', label: 'Rotation', hist: null },
+		{ id: 'water', label: 'Water', hist: null },
+		{ id: 'stress', label: 'Stress', hist: 'dry' },
+		{ id: 'heat', label: 'Heat', hist: 'heat' },
+		{ id: 'frost', label: 'Frost', hist: 'frost' }
 	] as const;
 
 	let area: HTMLElement;
 	let h = $state(H_HOME);
-	let y0 = 0;
+	let y = 0;
 	let h0 = H_HOME;
 
 	const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize);
 	const setH = (v: number) => (h = clamp(v, H_MIN, H_MAX));
 
 	function grabH(e: PointerEvent) {
-		y0 = e.clientY;
+		y = e.clientY;
 		h0 = h;
 		e.currentTarget instanceof HTMLElement &&
 			e.currentTarget.setPointerCapture(e.pointerId);
 	}
 
 	function dragH(e: PointerEvent) {
-		if (e.buttons === 1) setH(h0 + (y0 - e.clientY) / rem());
+		if (e.buttons === 1) setH(h0 + (y - e.clientY) / rem());
 	}
 
 	function sizeKeys(e: KeyboardEvent) {
@@ -120,7 +149,7 @@
 			class="relative flex-1 touch-none"
 		>
 			<div class="relative h-6 border-b border-edge">
-				{#each ticks(span) as t (t.d)}
+				{#each ticks(span, hOff(), y0()) as t (t.d)}
 					<div
 						class="absolute bottom-0 w-px {t.major ? 'h-2.5 bg-mute' : 'h-1.5 bg-mute/40'}"
 						style="left: {x(t.d, span)}%"
@@ -134,82 +163,77 @@
 				{/each}
 			</div>
 
-			<div class="relative h-8 border-b border-edge">
-				{#each top?.rotation ?? [] as crop, y (y)}
-					{@const win = canopyWin(y)}
-					<div
-						title="{crop} · year {y + 1}"
-						class="absolute top-1/2 flex h-5 -translate-y-1/2 items-center overflow-hidden rounded bg-raise px-1.5 text-[0.625rem] whitespace-nowrap text-ink"
-						style="left: {x(y * YEAR, span)}%; width: {x(Math.min(YEAR, span - y * YEAR), span)}%"
-					>
-						{crop}
-						{#if win}
-							<div
-								class="absolute bottom-0 h-1 bg-accent/60"
-								style="left: {x(win[0] - y * YEAR, YEAR)}%; width: {x(win[1] - win[0], YEAR)}%"
-							></div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-
-			{#each rows.slice(1) as row (row.id)}
+			{#each rows as row (row.id)}
 				<div class="relative h-8 border-b border-edge last:border-b-0">
-					{#if trace}
-						<svg
-							class="absolute inset-0 h-full w-full"
-							viewBox="0 0 {span} 32"
-							preserveAspectRatio="none"
-							aria-hidden="true"
-						>
-							{#if row.id === 'water'}
+					{#if row.id === 'rotation'}
+						{#each top?.rotation ?? [] as crop, y (y)}
+							{@const win = canopyWin(y)}
+							<div
+								title="{crop} · year {y + 1}"
+								class="absolute top-1/2 flex h-5 -translate-y-1/2 items-center overflow-hidden rounded bg-raise px-1.5 text-[0.625rem] whitespace-nowrap text-ink"
+								style="left: {x(hOff() + y * YEAR, span)}%; width: {x(YEAR, span)}%"
+							>
+								{crop}
+								{#if win}
+									<div
+										class="absolute bottom-0 h-1 bg-accent/60"
+										style="left: {x(win[0] - y * YEAR, YEAR)}%; width: {x(win[1] - win[0], YEAR)}%"
+									></div>
+								{/if}
+							</div>
+						{/each}
+					{:else if row.id === 'water'}
+						{#if trace}
+							<svg
+								class="absolute inset-0 h-full w-full"
+								viewBox="0 0 {span} 32"
+								preserveAspectRatio="none"
+								aria-hidden="true"
+							>
 								<path
-									d="M0 32 {trace.water
-										.map((v, i) => `L${i * BIN + BIN / 2} ${(1 - v) * 30 + 1}`)
-										.join(' ')} L{span} 32 Z"
+									d="M{hOff()} 32 {trace.water
+										.map((v, i) => `L${hOff() + i * BIN + BIN / 2} ${(1 - v) * 30 + 1}`)
+										.join(' ')} L{hOff() + trace.water.length * BIN} 32 Z"
 									class="fill-accent/20 stroke-accent"
 									stroke-width="1.5"
 									vector-effect="non-scaling-stroke"
 								/>
-							{:else if row.id === 'stress'}
-								{#each trace.stress as p, i (i)}
-									{@const lvl = stressLevel(p)}
-									{#if lvl}
-										<rect
-											x={i * BIN}
-											y={4}
-											width={BIN - 0.5}
-											height={24}
-											rx={1}
-											class="{stressFill[lvl]} opacity-70"
-										>
-											<title>{Math.round(p * 100)}% stressed · {dayLabel(i * BIN)}</title>
-										</rect>
-									{/if}
-								{/each}
-							{:else}
-								{#each trace.frost as p, i (i)}
-									{#if p > 0}
-										<rect
-											x={i * BIN + BIN / 2 - 0.75}
-											y={8}
-											width={1.5}
-											height={16}
-											class="fill-alert"
-										>
-											<title>{Math.round(p * 100)}% frost · {dayLabel(i * BIN)}</title>
-										</rect>
-									{/if}
-								{/each}
-							{/if}
-						</svg>
+							</svg>
+						{/if}
+					{:else}
+						{#if hist && row.hist}
+							{#each hist[row.hist] as [s, e] (s)}
+								<div
+									title="{row.hist} · observed · {dayLabel(s, hOff(), y0())} → {dayLabel(e, hOff(), y0())}"
+									class="absolute top-1/2 h-5 -translate-y-1/2 rounded-sm"
+									style="left: {x(s, span)}%; width: {x(e - s, span)}%; background: {solid(
+										row.id === 'stress' ? 'watch' : row.id === 'heat' ? 'alert' : 'mute'
+									)}"
+								></div>
+							{/each}
+						{/if}
+						{#each fcst(row.id) as [s, e, c] (s)}
+							<div
+								title="{row.id} · predicted · {dayLabel(hOff() + s, hOff(), y0())} → {dayLabel(hOff() + e, hOff(), y0())}"
+								class="absolute top-1/2 h-5 -translate-y-1/2 rounded-sm border"
+								style="left: {x(hOff() + s, span)}%; width: {x(e - s, span)}%; background-image: {stripe(
+									c
+								)}; border-color: color-mix(in oklab, var({COL[c]}) 50%, transparent)"
+							></div>
+						{/each}
 					{/if}
 				</div>
 			{/each}
 
+			{#if hOff()}
+				<div
+					class="pointer-events-none absolute inset-y-0 z-10 w-px bg-ink/50"
+					style="left: {x(hOff(), span)}%"
+				></div>
+			{/if}
 			<div
 				class="pointer-events-none absolute inset-y-0 z-10 w-px bg-accent"
-				style="left: {x(ui.day, span)}%"
+				style="left: {x(Math.min(ui.day, span), span)}%"
 			>
 				<div
 					class="absolute -left-1 top-0 size-2.5 rounded-sm bg-accent"

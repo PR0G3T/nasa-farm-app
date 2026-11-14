@@ -16,23 +16,36 @@ export const dayAt = (ratio: number, span: number) => clamp(Math.round(ratio * s
 export const month = (doy: number) => MONTH_END.findIndex((e) => doy < e);
 export const dom = (doy: number) => doy - (MONTH_END[month(doy) - 1] ?? 0) + 1;
 
-export const dayLabel = (d: number) =>
-	`Y${Math.floor(d / YEAR) + 1} · ${MONTH_NAME[month(d % YEAR)]} ${dom(d % YEAR)}`;
+const cal = (doy: number) => `${MONTH_NAME[month(doy)]} ${dom(doy)}`;
 
-/** Satellite imagery exists for real dates only — map sim-day onto this year's doy, capped at today. */
-export const dayISO = (d: number) => {
-	const y0 = Date.UTC(new Date().getUTCFullYear(), 0, 1);
-	return new Date(Math.min(y0 + (d % YEAR) * DAY_MS, Date.now())).toISOString().slice(0, 10);
+export const dayLabel = (d: number, hOff: number, y0: number) =>
+	d < hOff
+		? `${y0 + Math.floor(d / YEAR)} · ${cal(d % YEAR)}`
+		: `Y${Math.floor((d - hOff) / YEAR) + 1} · ${cal(d % YEAR)}`;
+
+/** Imagery exists for real dates only — history days map to their real dates,
+ * forecast days map to the same doy of the current year, capped at today. */
+export const dayISO = (d: number, hOff: number, y0: number) => {
+	const year = d < hOff ? y0 + Math.floor(d / YEAR) : new Date().getUTCFullYear();
+	return new Date(Math.min(Date.UTC(year, 0, 1) + (d % YEAR) * DAY_MS, Date.now()))
+		.toISOString()
+		.slice(0, 10);
 };
 
 export type Tick = { d: number; label?: string; major?: boolean };
 
-export function ticks(span: number): Tick[] {
-	const years = Math.ceil(span / YEAR);
+export function ticks(span: number, hOff: number, y0: number): Tick[] {
 	const out: Tick[] = [];
-	for (let y = 0; y < years; y++) {
-		out.push({ d: y * YEAR + 1, label: `Y${y + 1}`, major: true });
-		for (let m = 1; m < 12; m++) out.push({ d: y * YEAR + MONTH_END[m - 1] });
+	for (let d = 0; d < span; d += YEAR) {
+		out.push({
+			d: d + 1,
+			label: d < hOff ? `${y0 + d / YEAR}` : `Y${(d - hOff) / YEAR + 1}`,
+			major: true
+		});
+		for (let m = 1; m < 12; m++) {
+			const t = d + MONTH_END[m - 1];
+			if (t < span) out.push({ d: t });
+		}
 	}
 	return out;
 }

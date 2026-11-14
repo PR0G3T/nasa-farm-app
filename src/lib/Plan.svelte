@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { METRICS, rec } from '#lib/farm.js';
-	import { meta, recs, sel } from '#lib/state.svelte.js';
+	import { cur, meta, recs, sel } from '#lib/state.svelte.js';
 
 	const scenarios = $derived(meta.scenarios.length ? meta.scenarios : ['baseline']);
-	const cur = $derived(sel.field ? recs[sel.field.id]?.[sel.scenario] : undefined);
-	const best = $derived(cur?.top?.[0]);
-	const pareto = $derived(cur?.pareto?.length ?? 0);
+	const c = $derived(cur());
+	const best = $derived(c?.top?.[0]);
+	const pareto = $derived(c?.pareto?.length ?? 0);
 
 	const fmt = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
 	const sgn = new Intl.NumberFormat('en', {
@@ -59,14 +59,14 @@
 			{/each}
 		</div>
 
-		{#if cur === undefined}
+		{#if c === undefined}
 			<div class="mt-3 flex flex-col gap-2" aria-busy="true">
 				<div class="h-4 animate-pulse rounded-md bg-raise"></div>
 				<div class="h-4 w-2/3 animate-pulse rounded-md bg-raise"></div>
 				<div class="h-4 w-1/2 animate-pulse rounded-md bg-raise"></div>
 			</div>
-		{:else if cur.status !== 'ok' || !best}
-			<p class="mt-3 text-xs text-mute">{cur.detail ?? 'No result'}</p>
+		{:else if c.status !== 'ok' || !best}
+			<p class="mt-3 text-xs text-mute">{c.detail ?? 'No result'}</p>
 		{:else}
 			<p class="mt-3 truncate text-sm" title={best.rotation.join(' / ')}>
 				{best.rotation.join(' / ')}
@@ -86,7 +86,7 @@
 				{/each}
 			</dl>
 			<p class="mt-2 text-[0.625rem] text-mute">
-				{pareto} non-dominated · {cur.plans_evaluated} rotations · {cur.scenarios} scenarios
+				{pareto} non-dominated · {c.plans_evaluated} rotations · {c.scenarios} scenarios
 			</p>
 		{/if}
 	</aside>
