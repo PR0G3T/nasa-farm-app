@@ -4,7 +4,6 @@
 	import IconEyeOff from '@tabler/icons-svelte-runes/icons/eye-off';
 	import IconPhoto from '@tabler/icons-svelte-runes/icons/photo';
 	import IconPlant from '@tabler/icons-svelte-runes/icons/plant';
-	import IconSatellite from '@tabler/icons-svelte-runes/icons/satellite';
 	import IconTemperature from '@tabler/icons-svelte-runes/icons/temperature';
 	import { LAYERS } from '#lib/layers.js';
 
@@ -14,7 +13,7 @@
 		ndmi: IconDroplet,
 		lst: IconTemperature
 	};
-	import { overlay, selection, stats, useDate, useLayer, view } from '#lib/state.svelte.js';
+	import { overlay, selection, stats, useLayer } from '#lib/state.svelte.js';
 
 	const active = $derived(LAYERS.find((layer) => layer.id === overlay.id) ?? LAYERS[0]);
 	const stat = $derived(
@@ -33,7 +32,7 @@
 			: 'conic-gradient(#4a6741, #b08d57, #7d9db5, #4a6741)';
 
 	const label = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' });
-	const day = (iso: string) => label.format(new Date(`${iso}T12:00:00Z`));
+	const day = (iso: string) => (iso ? label.format(new Date(`${iso}T12:00:00Z`)) : '');
 	const tick = (value: number) => value.toFixed(active.digits);
 	const value = (input: number) =>
 		active.digits ? input.toFixed(active.digits) : Math.round(input).toString();
@@ -85,48 +84,21 @@
 		</button>
 	{/each}
 
-	<hr class="w-8 border-edge" />
-
-	<button
-		type="button"
-		aria-pressed={view.nasa}
-		onclick={() => (view.nasa = !view.nasa)}
-		title="Regional daily · 250 m"
-		class="flex w-full flex-col items-center gap-0.5 rounded-md p-1 {view.nasa
-			? 'bg-raise text-ink'
-			: 'text-mute hover:bg-raise hover:text-ink'}"
-	>
-		<IconSatellite size={17} stroke={1.75} />
-		<span class="text-[0.5625rem] leading-none">Daily</span>
-	</button>
 </aside>
 
 {#if overlay.visible}
 	<div
-		class="absolute left-3 top-1/2 z-10 flex w-52 -translate-y-1/2 flex-col gap-2.5 rounded-xl border border-edge bg-panel p-3 shadow-lg"
+		class="absolute bottom-3 right-14 z-10 flex items-center gap-3 rounded-xl border border-edge bg-panel px-3 py-2 shadow-lg"
 	>
-		<div class="flex items-baseline justify-between gap-2">
-			<p class="text-sm font-medium">{active.label}</p>
-			<p class="shrink-0 text-[0.625rem] text-mute">{active.native} m</p>
-		</div>
-		<p class="-mt-1.5 truncate text-[0.625rem] text-mute">{active.source}</p>
-
-		<div class="flex gap-0.5 overflow-x-auto rounded-lg border border-edge bg-canvas p-0.5">
-			{#each active.dates as date (date)}
-				<button
-					type="button"
-					aria-pressed={overlay.date === date}
-					onclick={() => useDate(date)}
-					class="h-6 flex-1 rounded-md px-1 text-[0.6875rem] whitespace-nowrap transition-colors {overlay.date ===
-					date
-						? 'bg-raise text-ink'
-						: 'text-mute hover:text-ink'}">{day(date)}</button
-				>
-			{/each}
+		<div class="flex flex-col">
+			<p class="text-sm leading-tight font-medium">{active.label}</p>
+			<p class="text-[0.625rem] tabular-nums text-mute">
+				{day(overlay.date)} · {active.native} m
+			</p>
 		</div>
 
 		{#if active.ramp.length}
-			<div class="flex flex-col gap-1">
+			<div class="flex w-36 flex-col gap-1">
 				<div class="h-1.5 rounded-full" style="background:{gradient}"></div>
 				<div class="flex justify-between text-[0.625rem] tabular-nums text-mute">
 					<span>{tick(active.lo)}</span>
@@ -137,27 +109,21 @@
 		{/if}
 
 		{#if stat}
-			<div class="flex flex-col gap-0.5 border-t border-edge pt-2">
-				<p class="truncate text-[0.625rem] text-mute">
-					{selection.field?.name} · {day(overlay.date)}
-				</p>
-				<p class="text-lg leading-tight tabular-nums">
+			<div class="flex flex-col gap-0.5 border-l border-edge pl-3">
+				<p class="max-w-32 truncate text-[0.625rem] text-mute">{selection.field?.name}</p>
+				<p class="leading-tight tabular-nums">
 					{value(stat.mean)}<span class="ml-0.5 text-[0.625rem] text-mute">{active.unit}</span>
 				</p>
 				<p class="text-[0.625rem] tabular-nums text-mute">
 					p10 {value(stat.p10)} · p90 {value(stat.p90)}
 				</p>
 				{#if sector !== null}
-					<p class="text-[0.625rem] tabular-nums text-mute">
-						sector {value(sector)} · {active.native} m
-					</p>
+					<p class="text-[0.625rem] tabular-nums text-mute">sector {value(sector)}</p>
 				{/if}
 			</div>
 		{:else if selection.field}
-			<div class="flex flex-col gap-0.5 border-t border-edge pt-2">
-				<p class="truncate text-[0.625rem] text-mute">
-					{selection.field.name} · {day(overlay.date)}
-				</p>
+			<div class="flex flex-col gap-0.5 border-l border-edge pl-3">
+				<p class="max-w-32 truncate text-[0.625rem] text-mute">{selection.field.name}</p>
 				<p class="text-[0.625rem] text-mute">No field sample</p>
 			</div>
 		{/if}

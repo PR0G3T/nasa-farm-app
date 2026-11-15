@@ -24,7 +24,75 @@ export type Stat = { mean: number; p10: number; p90: number; n: number };
 
 export type Stats = Record<string, Record<string, Record<string, Stat>>>;
 
-const S2 = ['2025-05-08', '2025-07-14', '2025-08-26'];
+const S2 = [
+	'2025-05-08',
+	'2025-07-14',
+	'2025-08-26',
+	'2026-06-19',
+	'2026-06-22',
+	'2026-06-24',
+	'2026-06-29',
+	'2026-07-02',
+	'2026-07-07',
+	'2026-07-11',
+	'2026-07-12',
+	'2026-07-14',
+	'2026-07-17',
+	'2026-07-19',
+	'2026-07-27',
+	'2026-07-29',
+	'2026-08-01',
+	'2026-08-03',
+	'2026-08-06',
+	'2026-08-08',
+	'2026-08-11',
+	'2026-08-20',
+	'2026-08-21',
+	'2026-08-26',
+	'2026-08-28',
+	'2026-09-02',
+	'2026-09-12',
+	'2026-10-02',
+	'2026-10-05',
+	'2026-10-07',
+	'2026-10-10',
+	'2026-10-12',
+	'2026-10-17',
+	'2026-10-20',
+	'2026-10-22',
+	'2026-10-25',
+	'2026-11-06',
+	'2026-11-08',
+	'2026-11-09',
+	'2026-11-11',
+	'2026-11-14'
+];
+const LS = [
+	'2025-07-23',
+	'2025-09-26',
+	'2026-06-16',
+	'2026-06-24',
+	'2026-06-25',
+	'2026-07-03',
+	'2026-07-11',
+	'2026-07-18',
+	'2026-07-19',
+	'2026-07-26',
+	'2026-07-27',
+	'2026-08-11',
+	'2026-08-20',
+	'2026-08-27',
+	'2026-08-28',
+	'2026-09-04',
+	'2026-09-12',
+	'2026-09-13',
+	'2026-09-28',
+	'2026-10-06',
+	'2026-10-07',
+	'2026-10-22',
+	'2026-10-23',
+	'2026-11-08'
+];
 const SENTINEL = 'Sentinel-2 L2A, ESA via Planetary Computer';
 const CANOPY = ['#d00000', '#f07000', '#e8bf1f', '#8ac248', '#2ca25f', '#006d2c'];
 const WATER = ['#c2181b', '#f06a1d', '#f2b01e', '#2ab0a5', '#1d7ec4', '#08306b'];
@@ -95,7 +163,7 @@ export const LAYERS: Layer[] = [
 		native: 100,
 		maxzoom: 12,
 		source: 'Landsat 8/9 C2 L2, USGS via Planetary Computer',
-		dates: ['2025-07-23', '2025-09-26']
+		dates: LS
 	}
 ];
 
@@ -178,6 +246,7 @@ export const layerOf = (id: string) => LAYERS.find((layer) => layer.id === id) ?
 
 /** Closest available date so the timeline never lands on a gap. */
 export function nearest(layer: Layer, date: string): string {
+	if (!layer.dates.length) return date;
 	return layer.dates.reduce((best, candidate) =>
 		Math.abs(Date.parse(candidate) - Date.parse(date)) <
 		Math.abs(Date.parse(best) - Date.parse(date))

@@ -8,6 +8,33 @@ export const HEIGHT_MIN = 8;
 export const HEIGHT_MAX = 24;
 export const HEIGHT_HOME = 11;
 
+/** Days shown around today when a parcel is selected. */
+export const WINDOW = 153;
+
+/** Real date of an absolute timeline day: the `offset` index is today. */
+export const isoAt = (day: number, offset: number) =>
+	new Date(Date.now() - (offset - day) * DAY_MS).toISOString().slice(0, 10);
+
+/** Absolute timeline day for a real date — inverse of `isoAt`. */
+export const winOf = (iso: string, offset: number) =>
+	offset - Math.round((Date.now() - Date.parse(`${iso}T12:00:00Z`)) / DAY_MS);
+
+/** Weekly window ticks labelled by real date (Mondays + both bounds). */
+export function wticks(lo: number, offset: number): Tick[] {
+	const out: Tick[] = [];
+	for (let day = lo; day <= offset; day++) {
+		const date = new Date(Date.now() - (offset - day) * DAY_MS);
+		const bound = day === lo || day === offset;
+		if (date.getUTCDay() !== 1 && !bound) continue;
+		out.push({
+			day,
+			label: `${MONTH_NAME[date.getUTCMonth()]} ${date.getUTCDate()}`,
+			major: date.getUTCDay() === 1
+		});
+	}
+	return out;
+}
+
 const MONTH_END = [31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365];
 const MONTH_NAME = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

@@ -20,11 +20,11 @@
 	import { Protocol } from 'pmtiles';
 	import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 	import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
-	import { DEM, ESRI_IMAGERY, ESRI_REFERENCE, IMAGERY, PRODUCTS, bounds, gibs, mask, parcels } from '#lib/geography.js';
+	import { DEM, ESRI_IMAGERY, ESRI_REFERENCE, PRODUCTS, bounds, gibs, mask, parcels } from '#lib/geography.js';
 	import { centroid, ring as boundary } from '#lib/parcels.js';
-	import { current, fields, historyOffset, meta, overlay, planIndex, selection, view, startYear } from '#lib/state.svelte.js';
-	import { layerOf } from '#lib/layers.js';
-	import { active, dayISO } from '#lib/timeline.js';
+	import { current, fields, historyOffset, meta, overlay, planIndex, selection, view } from '#lib/state.svelte.js';
+	import { layerOf, nearest } from '#lib/layers.js';
+	import { active, isoAt } from '#lib/timeline.js';
 	import type { Severity } from '#lib/timeline.js';
 	import { untrack } from 'svelte';
 
@@ -45,55 +45,6 @@
 	const HOME: [number, number] = [-93.62, 42.0];
 
 	let map: MaplibreMap | undefined = $state.raw();
-
-	const IDLE = 30_000;
-	const RATE = 6;
-
-	let animation = 0;
-	let idle: ReturnType<typeof setTimeout>;
-	let started = 0;
-	let bearing = 0;
-	let orbiting = false;
-
-	function frame(now: number) {
-		map?.jumpTo({ bearing: bearing + ((now - started) / 1000) * RATE });
-		animation = requestAnimationFrame(frame);
-	}
-
-	function startOrbit() {
-		if (!map) return;
-		orbiting = true;
-		bearing = map.getBearing();
-		const field = selection.field;
-		map.easeTo({
-			...(field && { center: field.center }),
-			pitch: 55,
-			duration: 1500
-		});
-		started = performance.now();
-		animation = requestAnimationFrame(frame);
-	}
-
-	let resuming = false;
-
-	function touch(immediate = false) {
-		if (orbiting) {
-			orbiting = false;
-			cancelAnimationFrame(animation);
-			map?.stop();
-			if (immediate) map?.easeTo({ pitch: 0, duration: 900 });
-			else resuming = true;
-		}
-		clearTimeout(idle);
-		idle = setTimeout(startOrbit, IDLE);
-	}
-
-	function release() {
-		if (resuming) {
-			resuming = false;
-			map?.easeTo({ pitch: 0, duration: 900 });
-		}
-	}
 
 	const style: StyleSpecification = {
 		version: 8,
@@ -124,7 +75,7 @@
 		mute: { color: '#808080', opacity: 0.65 }
 	};
 	const features = $derived(parcels(fields));
-	const date = $derived(dayISO(view.day, historyOffset(), startYear()));
+	const date = $derived(isoAt(view.day, historyOffset()));
 	const selected = $derived(selection.field?.id ?? '');
 	const shade = $derived(
 		selection.field?.ring.length ? mask(selection.field.ring) : null
@@ -209,25 +160,29 @@
 		});
 	});
 
+	/** Timeline cursor drives the shown scene — snapped to acquired dates. */
 	$effect(() => {
-		untrack(touch);
-		return () => {
-			clearTimeout(idle);
-			cancelAnimationFrame(animation);
-		};
+		const day = view.day;
+		if (!selection.field || !raster.dates.length) return;
+		untrack(() => {
+			overlay.date = nearest(raster, isoAt(day, historyOffset()));
+		});
+	});
+
+	/** Back to overview: newest scene, cursor home. */
+	let was = false;
+	$effect(() => {
+		const selected = !!selection.field;
+		untrack(() => {
+			if (!selected && (was || !raster.dates.includes(overlay.date)))
+				overlay.date = raster.dates.at(-1) ?? overlay.date;
+			if (!selected && was) view.day = historyOffset();
+			was = selected;
+		});
 	});
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-	class="relative h-full w-full"
-	onpointerdown={() => touch()}
-	onpointermove={(event) => event.buttons === 1 && touch()}
-	onpointerup={release}
-	onpointercancel={release}
-	onwheel={() => touch(true)}
-	ontouchstart={() => touch()}
->
+<div class="relative h-full w-full">
 	<MapLibre
 		bind:map
 		{style}
@@ -264,8 +219,8 @@
 			<LineLayer sourceLayer={CSB_LAYER} paint={{ 'line-color': '#ffffff', 'line-opacity': 0.15, 'line-width': 0.5 }} />
 		</VectorTileSource>
 
-		{#if overlay.visible}
-			{#key `${raster.id}|${overlay.date}`}
+		{#if overlay.visible && overlay.date}
+			{#key raster.id}
 				<RasterTileSource
 					id="overlay"
 					tiles={[tiles]}
@@ -280,19 +235,6 @@
 				</RasterTileSource>
 			{/key}
 		{/if}
-
-		<RasterTileSource
-			id="gibs"
-			tiles={[gibs(IMAGERY, date)]}
-			tileSize={256}
-			maxzoom={IMAGERY.zoom}
-			attribution="NASA Global Imagery Browse Services"
-		>
-			<RasterLayer
-				layout={{ visibility: view.nasa ? 'visible' : 'none' }}
-				paint={{ 'raster-opacity': fade(0.9) }}
-			/>
-		</RasterTileSource>
 
 		<HillshadeLayer
 			source="elevation"
@@ -324,10 +266,7 @@
 				onclick={pick}
 				onmousemove={cursor('pointer')}
 				onmouseleave={cursor('')}
-				paint={{
-					'fill-color': '#ffffff',
-					'fill-opacity': ['case', picked(selected), 0.16, 0.07]
-				}}
+				paint={{ 'fill-opacity': 0 }}
 			/>
 			<LineLayer
 				paint={{

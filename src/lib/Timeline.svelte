@@ -1,22 +1,25 @@
 <script lang="ts">
-	import { historyOffset, selection, startYear, stats, useDate, useLayer, view } from '#lib/state.svelte.js';
+	import { historyOffset, selection, stats, useLayer, view } from '#lib/state.svelte.js';
 	import {
 		BIN,
 		HEIGHT_HOME,
 		HEIGHT_MAX,
 		HEIGHT_MIN,
-		YEAR,
+		WINDOW,
 		clamp,
 		dayAt,
-		dayLabel,
-		dayOf,
-		ticks,
+		isoAt,
+		winOf,
+		wticks,
 		x
 	} from '#lib/timeline.js';
 	import { LAYERS, signals, type Signal } from '#lib/layers.js';
 
-	const span = $derived(Math.max(historyOffset(), YEAR));
-	const date = $derived(dayLabel(view.day, historyOffset(), startYear()));
+	const hi = $derived(historyOffset());
+	const lo = $derived(hi - WINDOW);
+	const X = (day: number) => x(day - lo, WINDOW);
+	const fmt = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' });
+	const date = $derived(fmt.format(new Date(`${isoAt(view.day, hi)}T12:00:00Z`)));
 
 	const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize);
 
@@ -36,10 +39,9 @@
 
 	const peaks = $derived(
 		selection.field
-			? signals(stats, selection.field.id).map((signal) => ({
-					signal,
-					day: dayOf(signal.date, historyOffset(), startYear(), span)
-				}))
+			? signals(stats, selection.field.id)
+					.map((signal) => ({ signal, day: winOf(signal.date, hi) }))
+					.filter((peak) => peak.day >= lo && peak.day <= hi)
 			: []
 	);
 
@@ -58,18 +60,37 @@
 	};
 
 	function jump(signal: Signal) {
-		view.day = dayOf(signal.date, historyOffset(), startYear(), span);
+		view.day = winOf(signal.date, hi);
 		useLayer(signal.layer.id);
-		useDate(signal.date);
 	}
 
 	const rows = $derived(
 		LAYERS.filter((layer) => layer.dir).map((layer) => ({ id: layer.id, label: layer.label }))
 	);
 
-	let initialized = false;
+	/** Parcel curve over the window: polyline points + scene dots, per row. */
+	const track = (id: string) => {
+		const fid = selection.field?.id;
+		const per = stats[id] ?? {};
+		if (!fid) return { points: '', dots: [] as { x: number; y: number }[] };
+		const samples = Object.keys(per)
+			.sort()
+			.map((iso) => ({ day: winOf(iso, hi), v: per[iso][fid]?.mean }))
+			.filter((p) => p.v !== undefined && p.day >= lo && p.day <= hi);
+		const vs = samples.map((p) => p.v!);
+		const span = Math.max(...vs) - Math.min(...vs) || 1;
+		const dots = samples.map((p) => ({
+			x: X(p.day),
+			y: 26 - ((p.v! - Math.min(...vs)) / span) * 20
+		}));
+		return {
+			points: dots.map((d) => `${d.x.toFixed(2)},${d.y.toFixed(1)}`).join(' '),
+			dots
+		};
+	};
+
 	$effect(() => {
-		if (!initialized && historyOffset()) ((view.day = historyOffset()), (initialized = true));
+		if (selection.field) view.day = hi;
 	});
 
 	let area = $state<HTMLElement>();
@@ -104,7 +125,7 @@
 	function seek(event: PointerEvent) {
 		if (!area) return;
 		const { left, width } = area.getBoundingClientRect();
-		view.day = dayAt((event.clientX - left) / width, span);
+		view.day = clamp(lo + dayAt((event.clientX - left) / width, WINDOW), lo, hi);
 	}
 
 	function grab(event: PointerEvent) {
@@ -116,8 +137,8 @@
 
 	function step(event: KeyboardEvent) {
 		const delta = event.shiftKey ? BIN : 1;
-		if (event.key === 'ArrowLeft') view.day = clamp(view.day - delta, 0, span);
-		if (event.key === 'ArrowRight') view.day = clamp(view.day + delta, 0, span);
+		if (event.key === 'ArrowLeft') view.day = clamp(view.day - delta, lo, hi);
+		if (event.key === 'ArrowRight') view.day = clamp(view.day + delta, lo, hi);
 	}
 </script>
 
@@ -164,8 +185,8 @@
 			bind:this={area}
 			role="slider"
 			aria-label="Timeline"
-			aria-valuemin={0}
-			aria-valuemax={span}
+			aria-valuemin={lo}
+			aria-valuemax={hi}
 			aria-valuenow={view.day}
 			tabindex="0"
 			onpointerdown={grab}
@@ -174,22 +195,39 @@
 			class="relative mr-16 flex-1 touch-none"
 		>
 			<div class="relative h-6 border-b border-edge">
-				{#each ticks(span, historyOffset(), startYear()) as tick (tick.day)}
+				{#each wticks(lo, hi) as tick (tick.day)}
 					<div
 						class="absolute bottom-0 w-px {tick.major ? 'h-2.5 bg-mute' : 'h-1.5 bg-mute/40'}"
-						style="left: {x(tick.day, span)}%"
+						style="left: {X(tick.day)}%"
 					></div>
 					{#if tick.label}
 						<span
 							class="absolute bottom-2 pl-1 text-[0.625rem] leading-none text-mute"
-							style="left: {x(tick.day, span)}%">{tick.label}</span
+							style="left: {X(tick.day)}%">{tick.label}</span
 						>
 					{/if}
 				{/each}
 			</div>
 
 			{#each rows as row (row.id)}
+				{@const t = track(row.id)}
 				<div class="relative h-8 border-b border-edge last:border-b-0">
+					<svg class="absolute inset-0 h-full w-full" viewBox="0 0 100 32" preserveAspectRatio="none">
+						<polyline
+							points={t.points}
+							fill="none"
+							stroke={MARK[row.id]}
+							stroke-width="1.5"
+							stroke-opacity="0.6"
+							vector-effect="non-scaling-stroke"
+						/>
+					</svg>
+					{#each t.dots as dot}
+						<div
+							class="pointer-events-none absolute size-1 -translate-x-1/2 -translate-y-1/2 rounded-full"
+							style="left: {dot.x}%; top: {dot.y}px; background: {MARK[row.id]}"
+						></div>
+					{/each}
 					{#each peaks.filter((peak) => peak.signal.layer.id === row.id) as peak (peak.signal.date)}
 						{@const s = peak.signal}
 						{@const tipText = `${s.layer.label} ${KIND[s.kind]}`}
@@ -201,32 +239,24 @@
 							onpointerdown={(event) => event.stopPropagation()}
 							onclick={() => jump(s)}
 							class="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rotate-45 rounded-[0.1875rem] border border-canvas transition-transform hover:scale-125"
-							style="left: {x(peak.day, span)}%; background: {MARK[s.layer.id]}"
+							style="left: {X(peak.day)}%; background: {MARK[s.layer.id]}"
 						></button>
 					{/each}
 				</div>
 			{/each}
 
-			{#if historyOffset() && span > historyOffset()}
-				<div
-					class="pointer-events-none absolute inset-y-0 bg-accent/5"
-					style="left: {x(historyOffset(), span)}%; right: 0"
-				></div>
-			{/if}
-			{#if historyOffset()}
-				<div
-					class="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-ink/70"
-					style="left: {x(historyOffset(), span)}%"
+			<div
+				class="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-ink/70"
+				style="left: {X(hi)}%"
+			>
+				<span
+					class="absolute top-0 left-1 text-[0.5625rem] leading-none text-mute uppercase"
+					>today</span
 				>
-					<span
-						class="absolute top-0 left-1 text-[0.5625rem] leading-none text-mute uppercase"
-						>today</span
-					>
-				</div>
-			{/if}
+			</div>
 			<div
 				class="pointer-events-none absolute inset-y-0 z-10 w-px bg-accent"
-				style="left: {x(Math.min(view.day, span), span)}%"
+				style="left: {X(clamp(view.day, lo, hi))}%"
 			>
 				<div
 					class="absolute -left-1 top-0 size-2.5 rounded-sm bg-accent"
