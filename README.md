@@ -117,9 +117,9 @@ challenge suggests)*
 
 ## Demo
 
-<video src="https://raw.githubusercontent.com/PR0G3T/nasa-farm-app/main/Presentation_Video.mp4" controls width="100%"></video>
+![FARM demo](assets/demo.gif)
 
-[Watch the presentation video](Presentation_Video.mp4)
+[Full presentation video](Presentation_Video.mp4) (30 s, sound)
 
 ## Links
 
