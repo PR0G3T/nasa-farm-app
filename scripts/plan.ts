@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from '../src/lib/parcels.ts';
 
 const app = fileURLToPath(new URL('..', import.meta.url));
-const farm = fileURLToPath(new URL('../../nasa-farm', import.meta.url));
+const farm = fileURLToPath(new URL('../../nasa-farm-jepa', import.meta.url));
 const inputs = process.argv.slice(2);
 const scenarios = inputs.length
 	? inputs

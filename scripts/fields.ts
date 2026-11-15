@@ -5,7 +5,7 @@
 import { fileURLToPath } from 'node:url';
 
 const app = fileURLToPath(new URL('..', import.meta.url));
-const farm = fileURLToPath(new URL('../../nasa-farm', import.meta.url));
+const farm = fileURLToPath(new URL('../../nasa-farm-jepa', import.meta.url));
 const inputs = process.argv.slice(2);
 
 const envFile = `${farm}/.env`;
