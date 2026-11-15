@@ -12,7 +12,7 @@ import {
 	selection
 } from './state.svelte.js';
 
-const field: Field = { id: 'P1', name: 'P1', crop: 'Blé', ha: 4.2, center: [1.61, 48.2], ring: [] };
+const field: Field = { id: 'P1', name: 'P1', crop: 'Corn', ha: 4.2, center: [-93.62, 42.0], ring: [] };
 
 const result = (site: Partial<Site>): Result => ({
 	site: {

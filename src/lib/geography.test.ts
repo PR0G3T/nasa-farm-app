@@ -15,7 +15,7 @@ const FIELD: Field = {
 	name: 'F1',
 	crop: 'Corn',
 	ha: 10,
-	center: [1.6, 48.2],
+	center: [-93.62, 42.0],
 	ring: RING
 };
 
