@@ -1,10 +1,11 @@
-// Regenerate static/plan.json + static/plan/{id}.json — apicarto parcels
-// → nasa-farm export (index + per-field shards).
+// Regenerate static/plan.json + static/plan/{id}.json — CSB fields
+// (static/fields.geojson, see scripts/fields.ts) → nasa-farm export
+// (index + per-field shards).
 // Usage: bun scripts/plan.ts [scenario[:k=v,...]]...
 // Default scenarios: baseline, warm (+2°C), dry (-20% precip).
 
 import { fileURLToPath } from 'node:url';
-import { parse, url } from '../src/lib/parcels.ts';
+import { parse } from '../src/lib/parcels.ts';
 
 const app = fileURLToPath(new URL('..', import.meta.url));
 const farm = fileURLToPath(new URL('../../nasa-farm', import.meta.url));
@@ -13,9 +14,8 @@ const scenarios = inputs.length
 	? inputs
 	: ['baseline', 'warm:delta_t=2', 'dry:precip_scale=0.8'];
 
-const response = await fetch(url());
-if (!response.ok) throw new Error(`apicarto ${response.status}`);
-const points = parse(await response.json()).map((field) => ({
+const collection = await Bun.file(`${app}/static/fields.geojson`).json();
+const points = parse(collection).map((field) => ({
 	id: field.id,
 	name: field.name,
 	crop: field.crop,
@@ -23,7 +23,7 @@ const points = parse(await response.json()).map((field) => ({
 	latitude: field.center[1],
 	longitude: field.center[0]
 }));
-console.log(`${points.length} parcels → ${scenarios.join(', ')}`);
+console.log(`${points.length} fields → ${scenarios.join(', ')}`);
 
 const envFile = `${farm}/.env`;
 const child = Bun.spawn(

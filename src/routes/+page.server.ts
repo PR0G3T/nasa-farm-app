@@ -1,11 +1,11 @@
 import { FARM_API } from '$app/env/private';
 import { names, planFile } from '#lib/farm.js';
-import { parse, url } from '#lib/parcels.js';
+import { parse } from '#lib/parcels.js';
 import type { PageServerLoad } from './$types';
 
 const parcels = async (fetcher: typeof fetch) => {
 	try {
-		const response = await fetcher(url());
+		const response = await fetcher('/fields.geojson');
 		return response.ok ? parse(await response.json()) : [];
 	} catch {
 		return [];

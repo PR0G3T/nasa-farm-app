@@ -66,9 +66,9 @@ describe('recommend', () => {
 	const field = {
 		id: 'P1',
 		name: 'P1',
-		crop: 'Blé',
+		crop: 'Corn',
 		ha: 4.2,
-		center: [1.61, 48.2] as [number, number],
+		center: [-93.62, 42.0] as [number, number],
 		ring: []
 	};
 
@@ -94,8 +94,8 @@ describe('recommend', () => {
 		expect(target).toBe('/api/plan');
 		expect(JSON.parse(options.body)).toEqual({
 			id: 'P1',
-			latitude: 48.2,
-			longitude: 1.61,
+			latitude: 42.0,
+			longitude: -93.62,
 			scenario: 'warm'
 		});
 	});

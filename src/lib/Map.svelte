@@ -6,6 +6,7 @@
 		RasterLayer,
 		HillshadeLayer,
 		GeoJSONSource,
+		VectorTileSource,
 		FillLayer,
 		LineLayer,
 		NavigationControl,
@@ -17,14 +18,29 @@
 		Hash
 	} from 'svelte-maplibre-gl';
 	import IconSatellite from '@tabler/icons-svelte-runes/icons/satellite';
-	import type { Map as MaplibreMap, MapLayerMouseEvent, StyleSpecification } from 'maplibre-gl';
+	import { addProtocol, type Map as MaplibreMap, type MapLayerMouseEvent, type StyleSpecification } from 'maplibre-gl';
+	import { Protocol } from 'pmtiles';
 	import type { FeatureCollection } from 'geojson';
 	import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 	import { DEM, ESRI_IMAGERY, ESRI_REFERENCE, IMAGERY, PRODUCTS, bounds, gibs, mask, parcels } from '#lib/geography.js';
-	import { current, fields, historyOffset, planIndex, selection, view, startYear } from '#lib/state.svelte.js';
+	import { current, fields, historyOffset, meta, planIndex, selection, view, startYear } from '#lib/state.svelte.js';
 	import { active, dayISO } from '#lib/timeline.js';
 	import type { Severity } from '#lib/timeline.js';
 	import { untrack } from 'svelte';
+
+	addProtocol('pmtiles', new Protocol().tile);
+
+	/** USDA CSB — all 16.2 M US field boundaries, tiled once on Source Coop. */
+	const CSB = 'pmtiles://https://data.source.coop/fiboa/us-usda-cropland/us_usda_cropland.pmtiles';
+	const CSB_LAYER = 'us_usda_cropland';
+	const CSB_COLORS: ExpressionSpecification = [
+		'match', ['get', 'crop:name'],
+		'Corn', '#ffd400',
+		'Soybeans', '#267300',
+		'Alfalfa', '#ffa8e3',
+		'Winter Wheat', '#a87000',
+		'#546a7b'
+	];
 
 	let map: MaplibreMap | undefined = $state.raw();
 
@@ -108,14 +124,16 @@
 	const features = $derived(parcels(fields));
 	const date = $derived(dayISO(view.day, historyOffset(), startYear()));
 	const selected = $derived(selection.field?.id ?? '');
-	const shade = $derived(selection.field ? mask(selection.field.ring) : null);
+	const shade = $derived(
+		selection.field?.ring.length ? mask(selection.field.ring) : null
+	);
 	const trace = $derived(
 		current()?.site.status === 'ok' ? current()?.site.traces[planIndex()] : undefined
 	);
 	const now = $derived(active(view.day, historyOffset(), trace, current()?.site.history));
 	const product = $derived(now ? PRODUCTS[now.id] : null);
 	const ring = $derived(
-		selection.field
+		selection.field?.ring.length
 			? ({
 					type: 'FeatureCollection',
 					features: [
@@ -131,9 +149,19 @@
 	const picked = (id: string): ExpressionSpecification => ['==', ['get', 'id'], id];
 
 	function pick(event: MapLayerMouseEvent) {
-		const id = event.features?.[0]?.properties?.id;
-		const field = fields.find((candidate) => candidate.id === id);
-		if (field) selection.field = field;
+		const properties = event.features?.[0]?.properties;
+		const id = String(properties?.id ?? '');
+		const known = fields.find((candidate) => candidate.id === id);
+		if (known) return (selection.field = known);
+		if (meta.live && id)
+			selection.field = {
+				id,
+				name: `CSB ${id.slice(-4)}`,
+				crop: properties?.['crop:name'] ?? 'Unknown',
+				ha: 0,
+				center: [event.lngLat.lng, event.lngLat.lat],
+				ring: []
+			};
 	}
 
 	const cursor = (value: string) => () => {
@@ -143,7 +171,8 @@
 	$effect(() => {
 		const field = selection.field;
 		untrack(() => {
-			if (field) map?.fitBounds(bounds(field.ring), { padding: 80, maxZoom: 15 });
+			if (field?.ring.length)
+				map?.fitBounds(bounds(field.ring), { padding: 80, maxZoom: 15 });
 		});
 	});
 
@@ -169,7 +198,7 @@
 	<MapLibre
 		bind:map
 		{style}
-		center={[1.61, 48.2]}
+		center={[-93.62, 42.0]}
 		zoom={10.5}
 		attributionControl={false}
 		autoloadGlobalCss={false}
@@ -182,6 +211,23 @@
 		>
 			<RasterLayer />
 		</RasterTileSource>
+
+		<VectorTileSource
+			url={CSB}
+			attribution="USDA NASS Crop Sequence Boundaries"
+		>
+			<FillLayer
+				sourceLayer={CSB_LAYER}
+				onclick={pick}
+				onmousemove={cursor('pointer')}
+				onmouseleave={cursor('')}
+				paint={{
+					'fill-color': CSB_COLORS,
+					'fill-opacity': 0.28
+				}}
+			/>
+			<LineLayer sourceLayer={CSB_LAYER} paint={{ 'line-color': '#ffffff', 'line-opacity': 0.15, 'line-width': 0.5 }} />
+		</VectorTileSource>
 
 		<RasterTileSource
 			id="gibs"

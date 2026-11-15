@@ -66,8 +66,13 @@
 			<div class="min-w-0">
 				<p class="truncate text-sm font-medium">{selection.field.name}</p>
 				<p class="truncate text-xs text-mute">
-					{selection.field.crop} · {selection.field.ha} ha
+					{selection.field.crop}{selection.field.ha ? ` · ${selection.field.ha} ha` : ''}
 				</p>
+				{#if selection.field.sequence?.length}
+					<p class="truncate text-[0.625rem] text-mute" title={selection.field.sequence.join(' → ')}>
+						{selection.field.sequence.join(' → ')}
+					</p>
+				{/if}
 			</div>
 			<span class="shrink-0 pt-0.5 text-[0.625rem] text-mute"
 				>{meta.live ? 'live' : 'static'}</span

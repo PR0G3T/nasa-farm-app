@@ -2,57 +2,14 @@ import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import type { Field } from './data.js';
 import { shoelace } from './geography.js';
 
-const YEAR = 2024;
-const MAX = 40;
-
-const REGION: [number, number][] = [
-	[1.56, 48.17],
-	[1.66, 48.17],
-	[1.66, 48.23],
-	[1.56, 48.23],
-	[1.56, 48.17]
-];
-
-export function url(): string {
-	const geometry = { type: 'Polygon', coordinates: [REGION] };
-	return `https://apicarto.ign.fr/api/rpg/v2?geom=${encodeURIComponent(
-		JSON.stringify(geometry)
-	)}&annee=${YEAR}`;
-}
-
-const CULTURES: Record<string, string> = {
-	BDH: 'Blé dur',
-	BTH: 'Blé tendre',
-	BDP: 'Blé dur printemps',
-	ORH: "Orge d'hiver",
-	ORP: 'Orge de printemps',
-	CZH: "Colza d'hiver",
-	MIS: 'Maïs ensilage',
-	MAI: 'Maïs',
-	BTN: 'Betterave',
-	TTH: 'Tournesol',
-	FPH: 'Féverole',
-	PPH: 'Pois',
-	LUZ: 'Luzerne',
-	JAC: 'Jachère',
-	POT: 'Pomme de terre',
-	PTC: 'Pomme de terre'
-};
-
-/** RPG culture code → model crop, for the current-practice marker. */
-const KIND: Record<string, string> = {
-	BDH: 'wheat',
-	BTH: 'wheat',
-	BDP: 'wheat',
-	ORH: 'wheat',
-	ORP: 'wheat',
-	MIS: 'maize',
-	MAI: 'maize',
-	LUZ: 'alfalfa',
-	JAC: 'fallow',
-	PPH: 'soybean',
-	FPH: 'soybean',
-	TTH: 'sorghum'
+/** `fields.geojson` — emitted by `nasa-farm fields` (USDA CSB). */
+export type Properties = {
+	id: string;
+	name?: string;
+	crop?: string;
+	kind?: string;
+	ha?: number;
+	sequence?: string[];
 };
 
 const close = (ring: [number, number][]) =>
@@ -82,24 +39,24 @@ export function parse(collection: FeatureCollection): Field[] {
 	return collection.features
 		.filter(
 			(feature) =>
-				(feature.properties?.surf_parc ?? 0) > 0 &&
+				(feature.properties?.ha ?? 0) > 0 &&
 				(feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon')
 		)
 		.map((feature): Field => {
 			const ring = outer(feature.geometry as Polygon | MultiPolygon).reduce((largest, other) =>
 				Math.abs(shoelace(largest)) > Math.abs(shoelace(other)) ? largest : other
 			);
-			const properties = feature.properties ?? {};
+			const properties = (feature.properties ?? {}) as Properties;
 			return {
-				id: String(properties.id_parcel ?? feature.id),
-				name: `P${properties.id_parcel ?? feature.id}`,
-				crop: CULTURES[properties.code_cultu as string] ?? properties.code_cultu ?? 'Autre',
-				kind: KIND[properties.code_cultu as string],
-				ha: properties.surf_parc,
+				id: String(properties.id ?? feature.id),
+				name: properties.name ?? String(properties.id ?? feature.id),
+				crop: properties.crop ?? 'Other',
+				kind: properties.kind,
+				ha: properties.ha ?? 0,
 				center: centroid(ring),
-				ring
+				ring,
+				sequence: properties.sequence
 			};
 		})
-		.toSorted((first, second) => second.ha - first.ha)
-		.slice(0, MAX);
+		.toSorted((first, second) => second.ha - first.ha);
 }
