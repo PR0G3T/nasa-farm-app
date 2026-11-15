@@ -68,13 +68,13 @@ describe('ticks', () => {
 
 describe('dayLabel', () => {
 	it('labels history days with the real year', () => {
-		expect(dayLabel(0, OFFSET, ORIGIN)).toBe('2023 · Jan 1');
-		expect(dayLabel(YEAR, OFFSET, ORIGIN)).toBe('2024 · Jan 1');
+		expect(dayLabel(0, OFFSET, ORIGIN)).toBe('2023 Jan 1');
+		expect(dayLabel(YEAR, OFFSET, ORIGIN)).toBe('2024 Jan 1');
 	});
 
 	it('labels forecast days with the plan year', () => {
-		expect(dayLabel(OFFSET, OFFSET, ORIGIN)).toBe('Y1 · Jan 1');
-		expect(dayLabel(OFFSET + YEAR, OFFSET, ORIGIN)).toBe('Y2 · Jan 1');
+		expect(dayLabel(OFFSET, OFFSET, ORIGIN)).toBe('Y1 Jan 1');
+		expect(dayLabel(OFFSET + YEAR, OFFSET, ORIGIN)).toBe('Y2 Jan 1');
 	});
 });
 

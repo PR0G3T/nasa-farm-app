@@ -2,6 +2,8 @@ export type Layer = {
 	id: string;
 	label: string;
 	detail: string;
+	/** One-line plain explanation shown on hover. */
+	hint: string;
 	unit: string;
 	lo: number;
 	hi: number;
@@ -103,6 +105,7 @@ export const LAYERS: Layer[] = [
 		id: 'rgb',
 		label: 'True colour',
 		detail: 'Surface reflectance composite',
+		hint: 'Satellite photo, the field as your eyes would see it',
 		unit: '',
 		lo: 0,
 		hi: 1,
@@ -118,6 +121,7 @@ export const LAYERS: Layer[] = [
 		id: 'ndvi',
 		label: 'NDVI',
 		detail: 'Canopy greenness',
+		hint: 'Crop vigor, green is healthy growth and red is bare or stressed',
 		unit: '',
 		lo: 0,
 		hi: 0.85,
@@ -135,6 +139,7 @@ export const LAYERS: Layer[] = [
 		id: 'ndmi',
 		label: 'Water',
 		detail: 'Canopy water content',
+		hint: 'Water inside the canopy, blue is hydrated and red is dry stress',
 		unit: '',
 		lo: -0.35,
 		hi: 0.55,
@@ -152,6 +157,7 @@ export const LAYERS: Layer[] = [
 		id: 'lst',
 		label: 'Heat',
 		detail: 'Land surface temperature',
+		hint: 'Ground and leaf temperature, red means heat stress',
 		unit: '°C',
 		lo: 15,
 		hi: 45,

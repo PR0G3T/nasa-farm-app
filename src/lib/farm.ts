@@ -86,6 +86,32 @@ export function shard(fetcher: typeof fetch, id: string): Promise<Shard | null> 
 	return pending;
 }
 
+export type FieldDetail = {
+	field: { fid: string; name: string; crop: string; kind: string; ha: number };
+	soil: {
+		depth: number; clay: number; sand: number; bd: number; soc: number; ph: number;
+		clay_lo?: number; sand_lo?: number; bd_lo?: number;
+		clay_hi?: number; sand_hi?: number; bd_hi?: number;
+	} | null;
+	rotation: { year: number; kind: string | null; label: string | null }[];
+	weather?: {
+		acquired: string; tmin: number; tmax: number; precip: number;
+		gwetroot: number; precip_7d: number; precip_30d: number;
+	};
+};
+
+const details = new Map<string, Promise<FieldDetail | null>>();
+export function fieldDetail(fetcher: typeof fetch, id: string): Promise<FieldDetail | null> {
+	let pending = details.get(id);
+	if (!pending) {
+		pending = fetcher(`/api/field/${encodeURIComponent(id)}`)
+			.then((response) => (response.ok ? (response.json() as Promise<FieldDetail>) : null))
+			.catch(() => null);
+		details.set(id, pending);
+	}
+	return pending;
+}
+
 export const parameters = (plan: PlanIndex | null, scenario: string): Parameters =>
 	plan?.scenarios?.[scenario]?.params ?? {};
 

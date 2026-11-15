@@ -21,6 +21,19 @@ const live = (fetcher: typeof fetch) =>
 		: Promise.resolve(false);
 
 const catalog = async (fetcher: typeof fetch): Promise<Stats> => {
+	if (FARM_API) {
+		try {
+			const response = await fetcher(`${FARM_API}/v1/layers`, {
+				signal: AbortSignal.timeout(4_000)
+			});
+			if (response.ok) {
+				const payload = (await response.json()) as { stats?: Stats };
+				if (payload.stats && Object.keys(payload.stats).length) return payload.stats;
+			}
+		} catch {
+			// fall through to the static catalog
+		}
+	}
 	try {
 		const response = await fetcher('/layers.json');
 		if (!response.ok) return {};

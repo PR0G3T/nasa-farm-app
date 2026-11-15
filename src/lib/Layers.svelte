@@ -31,11 +31,11 @@
 			? `linear-gradient(180deg, ${layer.ramp.join(', ')})`
 			: 'conic-gradient(#4a6741, #b08d57, #7d9db5, #4a6741)';
 
-	const label = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' });
-	const day = (iso: string) => (iso ? label.format(new Date(`${iso}T12:00:00Z`)) : '');
 	const tick = (value: number) => value.toFixed(active.digits);
 	const value = (input: number) =>
 		active.digits ? input.toFixed(active.digits) : Math.round(input).toString();
+	const pct = (input: number) =>
+		Math.max(0, Math.min(100, ((input - active.lo) / (active.hi - active.lo || 1)) * 100));
 </script>
 
 <aside
@@ -66,7 +66,7 @@
 			type="button"
 			aria-pressed={active.id === layer.id}
 			onclick={() => useLayer(layer.id)}
-			title="{layer.label} · {layer.detail} · {layer.native} m"
+			title={layer.hint}
 			class="flex w-full flex-col items-center gap-0.5 rounded-md p-1 {active.id === layer.id
 				? 'bg-raise text-ink'
 				: 'text-mute hover:bg-raise hover:text-ink'}"
@@ -86,46 +86,70 @@
 
 </aside>
 
-{#if overlay.visible}
+{#if overlay.visible && active.ramp.length}
 	<div
 		class="absolute bottom-3 right-14 z-10 flex items-center gap-3 rounded-xl border border-edge bg-panel px-3 py-2 shadow-lg"
 	>
-		<div class="flex flex-col">
-			<p class="text-sm leading-tight font-medium">{active.label}</p>
-			<p class="text-[0.625rem] tabular-nums text-mute">
-				{day(overlay.date)} · {active.native} m
-			</p>
-		</div>
+		<p class="text-sm leading-tight font-medium">{active.label}</p>
 
 		{#if active.ramp.length}
 			<div class="flex w-36 flex-col gap-1">
-				<div class="h-1.5 rounded-full" style="background:{gradient}"></div>
+				<div class="relative h-1.5 rounded-full" style="background:{gradient}">
+					{#if stat}
+						<span
+							class="absolute inset-y-[-3px] w-[3px] -translate-x-1/2 rounded-sm bg-white shadow-[0_0_0_1px_var(--color-ink)]"
+							style="left:{pct(stat.mean)}%"
+							title="field {value(stat.mean)}"
+						></span>
+					{/if}
+					{#if sector !== null}
+						<span
+							class="absolute inset-y-[-3px] w-[3px] -translate-x-1/2 rounded-sm bg-mute shadow-[0_0_0_1px_var(--color-ink)]"
+							style="left:{pct(sector)}%"
+							title="neighbors {value(sector)}"
+						></span>
+					{/if}
+				</div>
 				<div class="flex justify-between text-[0.625rem] tabular-nums text-mute">
 					<span>{tick(active.lo)}</span>
 					<span>{tick((active.lo + active.hi) / 2)}</span>
 					<span>{tick(active.hi)}{active.unit}</span>
 				</div>
+				{#if stat || sector !== null}
+					<div class="flex gap-2.5 text-[0.5625rem] text-mute">
+						{#if stat}
+							<span class="flex items-center gap-1">
+								<span
+									class="h-2 w-[3px] rounded-sm bg-white shadow-[0_0_0_1px_var(--color-ink)]"
+								></span>field
+							</span>
+						{/if}
+						{#if sector !== null}
+							<span class="flex items-center gap-1">
+								<span
+									class="h-2 w-[3px] rounded-sm bg-mute shadow-[0_0_0_1px_var(--color-ink)]"
+								></span>neighbors
+							</span>
+						{/if}
+					</div>
+				{/if}
 			</div>
 		{/if}
 
 		{#if stat}
 			<div class="flex flex-col gap-0.5 border-l border-edge pl-3">
-				<p class="max-w-32 truncate text-[0.625rem] text-mute">{selection.field?.name}</p>
 				<p class="leading-tight tabular-nums">
 					{value(stat.mean)}<span class="ml-0.5 text-[0.625rem] text-mute">{active.unit}</span>
 				</p>
 				<p class="text-[0.625rem] tabular-nums text-mute">
-					p10 {value(stat.p10)} · p90 {value(stat.p90)}
+					field range {value(stat.p10)} – {value(stat.p90)}
 				</p>
 				{#if sector !== null}
-					<p class="text-[0.625rem] tabular-nums text-mute">sector {value(sector)}</p>
+					<p class="text-[0.625rem] tabular-nums text-mute">neighbors {value(sector)}</p>
 				{/if}
 			</div>
 		{:else if selection.field}
-			<div class="flex flex-col gap-0.5 border-l border-edge pl-3">
-				<p class="max-w-32 truncate text-[0.625rem] text-mute">{selection.field.name}</p>
-				<p class="text-[0.625rem] text-mute">No field sample</p>
-			</div>
+			<p class="border-l border-edge pl-3 text-[0.625rem] text-mute">No field sample</p>
 		{/if}
 	</div>
 {/if}

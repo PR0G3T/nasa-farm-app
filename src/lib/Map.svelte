@@ -136,14 +136,16 @@
 		}
 	}
 
-	/** Anything clicked that is not the selected parcel releases the focus. */
+	let leaving = $state(false);
+
+	/** Click outside the focused parcel asks before releasing the focus. */
 	function voided(event: MapMouseEvent) {
 		const selected = selection.field?.id;
 		if (selected == null || !map) return;
 		const self = map
 			.queryRenderedFeatures(event.point)
 			.some((feature) => String(feature.properties?.id ?? '') === selected);
-		if (!self) selection.field = null;
+		if (!self) leaving = true;
 	}
 
 	const cursor = (value: string) => () => {
@@ -181,6 +183,8 @@
 		});
 	});
 </script>
+
+<svelte:window onkeydown={(event) => event.key === 'Escape' && (leaving = false)} />
 
 <div class="relative h-full w-full">
 	<MapLibre
@@ -320,14 +324,50 @@
 		<AttributionControl position="bottom-right" compact />
 	</MapLibre>
 
-	{#if now && product}
+	{#if leaving && selection.field}
+		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+		<div
+			class="absolute inset-0 z-30 grid place-items-center bg-black/40"
+			onclick={() => (leaving = false)}
+		>
+			<div
+				role="dialog"
+				aria-modal="true"
+				aria-label="Leave parcel"
+				tabindex="-1"
+				class="w-64 rounded-xl border border-edge bg-panel p-4 shadow-lg"
+				onclick={(event) => event.stopPropagation()}
+			>
+				<p class="text-sm font-medium">Leave {selection.field.name}?</p>
+				<p class="mt-1 text-xs text-mute">Back to the general view.</p>
+				<div class="mt-3 flex justify-end gap-2">
+					<button
+						type="button"
+						onclick={() => (leaving = false)}
+						class="h-7 rounded-md border border-edge px-3 text-xs text-mute transition-colors hover:text-ink"
+						>Stay</button
+					>
+					<button
+						type="button"
+						onclick={() => {
+							leaving = false;
+							selection.field = null;
+						}}
+						class="h-7 rounded-md bg-accent px-3 text-xs text-white transition-colors hover:opacity-90"
+						>Leave</button
+					>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	{#if now}
 		<div
 			class="pointer-events-none absolute bottom-10 left-2 z-10 rounded-md border border-edge bg-panel px-2 py-1"
 		>
 			<p class="text-[0.625rem] font-medium whitespace-nowrap capitalize text-ink">
-				{now.id} · {now.severity} · {now.origin}
+				{now.id}, {now.severity}, {now.origin}
 			</p>
-			<p class="text-[0.625rem] whitespace-nowrap text-mute">{product.label} · {date}</p>
 		</div>
 	{/if}
 </div>

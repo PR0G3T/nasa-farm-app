@@ -54,9 +54,9 @@
 
 	const describe = (s: Signal) => {
 		const fmt = (v: number) => `${v.toFixed(s.layer.digits)}${s.layer.unit}`;
-		if (s.kind === 'sector') return `${s.date} · ${fmt(s.value)} vs sector ${fmt(s.ref)}`;
-		if (s.kind === 'limit') return `${s.date} · ${fmt(s.value)} vs limit ${fmt(s.ref)}`;
-		return `${s.date} · ${fmt(s.value)} vs ${fmt(s.ref)} on ${s.prev}`;
+		if (s.kind === 'sector') return `${s.date}, ${fmt(s.value)} vs sector ${fmt(s.ref)}`;
+		if (s.kind === 'limit') return `${s.date}, ${fmt(s.value)} vs limit ${fmt(s.ref)}`;
+		return `${s.date}, ${fmt(s.value)} vs ${fmt(s.ref)} on ${s.prev}`;
 	};
 
 	function jump(signal: Signal) {
@@ -200,7 +200,7 @@
 						class="absolute bottom-0 w-px {tick.major ? 'h-2.5 bg-mute' : 'h-1.5 bg-mute/40'}"
 						style="left: {X(tick.day)}%"
 					></div>
-					{#if tick.label}
+					{#if tick.label && tick.day < hi}
 						<span
 							class="absolute bottom-2 pl-1 text-[0.625rem] leading-none text-mute"
 							style="left: {X(tick.day)}%">{tick.label}</span
@@ -233,7 +233,7 @@
 						{@const tipText = `${s.layer.label} ${KIND[s.kind]}`}
 						<button
 							type="button"
-							aria-label="{tipText} · {s.date}"
+							aria-label="{tipText}, {s.date}"
 							onpointerenter={(event) => tipOn(event, tipText, describe(s))}
 							onpointerleave={tipOff}
 							onpointerdown={(event) => event.stopPropagation()}
@@ -250,7 +250,7 @@
 				style="left: {X(hi)}%"
 			>
 				<span
-					class="absolute top-0 left-1 text-[0.5625rem] leading-none text-mute uppercase"
+					class="absolute top-1.5 left-1 text-[0.5625rem] leading-none text-mute uppercase"
 					>today</span
 				>
 			</div>

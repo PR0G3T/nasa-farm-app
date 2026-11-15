@@ -49,8 +49,8 @@ const date = (doy: number) => `${MONTH_NAME[month(doy)]} ${day(doy)}`;
 
 export const dayLabel = (day: number, offset: number, origin: number) =>
 	day < offset
-		? `${origin + Math.floor(day / YEAR)} · ${date(day % YEAR)}`
-		: `Y${Math.floor((day - offset) / YEAR) + 1} · ${date(day % YEAR)}`;
+		? `${origin + Math.floor(day / YEAR)} ${date(day % YEAR)}`
+		: `Y${Math.floor((day - offset) / YEAR) + 1} ${date(day % YEAR)}`;
 
 /** Imagery exists for real dates only — history days map to their real dates,
  * forecast days map to the same doy of the current year, capped at today. */
