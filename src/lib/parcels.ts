@@ -61,7 +61,7 @@ export function parse(collection: FeatureCollection): Field[] {
 				center: centroid(boundary),
 				ring: boundary,
 				sequence: properties.sequence,
-			kinds: properties.kinds
+				kinds: properties.kinds
 			};
 		})
 		.toSorted((first, second) => second.ha - first.ha);
