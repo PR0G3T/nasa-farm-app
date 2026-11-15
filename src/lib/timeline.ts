@@ -34,6 +34,17 @@ export const dayISO = (day: number, offset: number, origin: number) => {
 		.slice(0, 10);
 };
 
+/** Inverse of `dayISO`: timeline index for a real date, clamped to the span. */
+export const dayOf = (iso: string, offset: number, origin: number, span: number) => {
+	const year = Number(iso.slice(0, 4));
+	const doy = Math.round(
+		(Date.parse(`${iso}T12:00:00Z`) - Date.UTC(year, 0, 1)) / DAY_MS
+	);
+	const day =
+		year < new Date().getUTCFullYear() ? (year - origin) * YEAR + doy : offset + doy;
+	return clamp(day, 0, span);
+};
+
 export type Severity = 'watch' | 'alert' | 'mute';
 export type Segment = [start: number, end: number, severity: Severity];
 export type Hazard = 'stress' | 'heat' | 'frost';

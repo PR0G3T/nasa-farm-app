@@ -12,18 +12,18 @@
 		NavigationControl,
 		ScaleControl,
 		AttributionControl,
-		CustomControl,
 		Sky,
 		Light,
 		Hash
 	} from 'svelte-maplibre-gl';
-	import IconSatellite from '@tabler/icons-svelte-runes/icons/satellite';
-	import { addProtocol, type Map as MaplibreMap, type MapLayerMouseEvent, type StyleSpecification } from 'maplibre-gl';
+	import { addProtocol, type Map as MaplibreMap, type MapLayerMouseEvent, type MapMouseEvent, type StyleSpecification } from 'maplibre-gl';
 	import { Protocol } from 'pmtiles';
-	import type { FeatureCollection } from 'geojson';
+	import type { FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 	import type { ExpressionSpecification } from '@maplibre/maplibre-gl-style-spec';
 	import { DEM, ESRI_IMAGERY, ESRI_REFERENCE, IMAGERY, PRODUCTS, bounds, gibs, mask, parcels } from '#lib/geography.js';
-	import { current, fields, historyOffset, meta, planIndex, selection, view, startYear } from '#lib/state.svelte.js';
+	import { centroid, ring as boundary } from '#lib/parcels.js';
+	import { current, fields, historyOffset, meta, overlay, planIndex, selection, view, startYear } from '#lib/state.svelte.js';
+	import { layerOf } from '#lib/layers.js';
 	import { active, dayISO } from '#lib/timeline.js';
 	import type { Severity } from '#lib/timeline.js';
 	import { untrack } from 'svelte';
@@ -41,6 +41,8 @@
 		'Winter Wheat', '#a87000',
 		'#546a7b'
 	];
+
+	const HOME: [number, number] = [-93.62, 42.0];
 
 	let map: MaplibreMap | undefined = $state.raw();
 
@@ -132,6 +134,18 @@
 	);
 	const now = $derived(active(view.day, historyOffset(), trace, current()?.site.history));
 	const product = $derived(now ? PRODUCTS[now.id] : null);
+	const raster = $derived(layerOf(overlay.id));
+	const tiles = $derived(`/tiles/${raster.id}/${overlay.date}/{z}/{x}/{y}.webp`);
+	/** Coarse NASA products stay regional: gone by the time parcels are legible. */
+	const fade = (opacity: number): ExpressionSpecification => [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		9,
+		opacity,
+		11,
+		0
+	];
 	const ring = $derived(
 		selection.field?.ring.length
 			? ({
@@ -149,19 +163,36 @@
 	const picked = (id: string): ExpressionSpecification => ['==', ['get', 'id'], id];
 
 	function pick(event: MapLayerMouseEvent) {
+		if (selection.field) return;
 		const properties = event.features?.[0]?.properties;
 		const id = String(properties?.id ?? '');
 		const known = fields.find((candidate) => candidate.id === id);
 		if (known) return (selection.field = known);
-		if (meta.live && id)
+		if (meta.live && id) {
+			const geometry = event.features?.[0]?.geometry;
+			const edge =
+				geometry?.type === 'Polygon' || geometry?.type === 'MultiPolygon'
+					? boundary(geometry as Polygon | MultiPolygon)
+					: [];
 			selection.field = {
 				id,
 				name: `CSB ${id.slice(-4)}`,
 				crop: properties?.['crop:name'] ?? 'Unknown',
 				ha: 0,
-				center: [event.lngLat.lng, event.lngLat.lat],
-				ring: []
+				center: edge.length ? centroid(edge) : [event.lngLat.lng, event.lngLat.lat],
+				ring: edge
 			};
+		}
+	}
+
+	/** Anything clicked that is not the selected parcel releases the focus. */
+	function voided(event: MapMouseEvent) {
+		const selected = selection.field?.id;
+		if (selected == null || !map) return;
+		const self = map
+			.queryRenderedFeatures(event.point)
+			.some((feature) => String(feature.properties?.id ?? '') === selected);
+		if (!self) selection.field = null;
 	}
 
 	const cursor = (value: string) => () => {
@@ -173,6 +204,8 @@
 		untrack(() => {
 			if (field?.ring.length)
 				map?.fitBounds(bounds(field.ring), { padding: 80, maxZoom: 15 });
+			else if (!field)
+				map?.easeTo({ center: HOME, zoom: 10.5, pitch: 0, duration: 900 });
 		});
 	});
 
@@ -198,8 +231,9 @@
 	<MapLibre
 		bind:map
 		{style}
-		center={[-93.62, 42.0]}
+		center={HOME}
 		zoom={10.5}
+		onclick={voided}
 		attributionControl={false}
 		autoloadGlobalCss={false}
 		class="h-full w-full"
@@ -217,6 +251,7 @@
 			attribution="USDA NASS Crop Sequence Boundaries"
 		>
 			<FillLayer
+				id="csb"
 				sourceLayer={CSB_LAYER}
 				onclick={pick}
 				onmousemove={cursor('pointer')}
@@ -229,6 +264,23 @@
 			<LineLayer sourceLayer={CSB_LAYER} paint={{ 'line-color': '#ffffff', 'line-opacity': 0.15, 'line-width': 0.5 }} />
 		</VectorTileSource>
 
+		{#if overlay.visible}
+			{#key `${raster.id}|${overlay.date}`}
+				<RasterTileSource
+					id="overlay"
+					tiles={[tiles]}
+					tileSize={256}
+					maxzoom={raster.maxzoom}
+					attribution={raster.source}
+				>
+					<RasterLayer
+						beforeId="csb"
+						paint={{ 'raster-opacity': 1, 'raster-resampling': 'linear' }}
+					/>
+				</RasterTileSource>
+			{/key}
+		{/if}
+
 		<RasterTileSource
 			id="gibs"
 			tiles={[gibs(IMAGERY, date)]}
@@ -238,7 +290,7 @@
 		>
 			<RasterLayer
 				layout={{ visibility: view.nasa ? 'visible' : 'none' }}
-				paint={{ 'raster-opacity': 0.9 }}
+				paint={{ 'raster-opacity': fade(0.9) }}
 			/>
 		</RasterTileSource>
 
@@ -256,14 +308,14 @@
 					maxzoom={product.zoom}
 					attribution="NASA Global Imagery Browse Services"
 				>
-					<RasterLayer paint={{ 'raster-opacity': SEVERITY[now.severity].opacity }} />
+					<RasterLayer paint={{ 'raster-opacity': fade(SEVERITY[now.severity].opacity) }} />
 				</RasterTileSource>
 			{/key}
 		{/if}
 
 		<GeoJSONSource data={shade ?? EMPTY}>
 			<FillLayer
-				paint={{ 'fill-color': '#000000', 'fill-opacity': shade ? 0.5 : 0 }}
+				paint={{ 'fill-color': '#000000', 'fill-opacity': shade ? 0.88 : 0 }}
 			/>
 		</GeoJSONSource>
 
@@ -325,17 +377,6 @@
 
 		<Hash />
 		<NavigationControl position="top-right" visualizePitch />
-		<CustomControl position="top-right" group>
-			<button
-				type="button"
-				onclick={() => (view.nasa = !view.nasa)}
-				aria-pressed={view.nasa}
-				title="NASA daily imagery (timeline date)"
-				class="grid place-items-center {view.nasa ? 'text-accent' : 'text-ink'}"
-			>
-				<IconSatellite size={18} stroke={1.75} />
-			</button>
-		</CustomControl>
 		<ScaleControl position="bottom-left" />
 		<AttributionControl position="bottom-right" compact />
 	</MapLibre>

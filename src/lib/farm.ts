@@ -47,7 +47,7 @@ export type PlanIndex = {
 	columns: string[];
 	directions: number[];
 	rotations: string[][];
-	fields: Record<string, { name?: string; crop?: string; ha?: number }>;
+	fields: Record<string, { name?: string; crop?: string; ha?: number; history?: History }>;
 	scenarios: Record<string, { params: Parameters }>;
 };
 

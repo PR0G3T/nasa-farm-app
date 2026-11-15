@@ -35,6 +35,12 @@ export function centroid(ring: [number, number][]): [number, number] {
 	return area ? [x / (3 * area), y / (3 * area)] : ring[0];
 }
 
+export function ring(geometry: Polygon | MultiPolygon): [number, number][] {
+	return outer(geometry).reduce((largest, other) =>
+		Math.abs(shoelace(largest)) > Math.abs(shoelace(other)) ? largest : other
+	);
+}
+
 export function parse(collection: FeatureCollection): Field[] {
 	return collection.features
 		.filter(
@@ -43,9 +49,7 @@ export function parse(collection: FeatureCollection): Field[] {
 				(feature.geometry?.type === 'Polygon' || feature.geometry?.type === 'MultiPolygon')
 		)
 		.map((feature): Field => {
-			const ring = outer(feature.geometry as Polygon | MultiPolygon).reduce((largest, other) =>
-				Math.abs(shoelace(largest)) > Math.abs(shoelace(other)) ? largest : other
-			);
+			const boundary = ring(feature.geometry as Polygon | MultiPolygon);
 			const properties = (feature.properties ?? {}) as Properties;
 			return {
 				id: String(properties.id ?? feature.id),
@@ -53,8 +57,8 @@ export function parse(collection: FeatureCollection): Field[] {
 				crop: properties.crop ?? 'Other',
 				kind: properties.kind,
 				ha: properties.ha ?? 0,
-				center: centroid(ring),
-				ring,
+				center: centroid(boundary),
+				ring: boundary,
 				sequence: properties.sequence
 			};
 		})

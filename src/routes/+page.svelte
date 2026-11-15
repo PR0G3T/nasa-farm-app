@@ -1,16 +1,18 @@
 <script lang="ts">
 	import Map from '#lib/Map.svelte';
+	import Layers from '#lib/Layers.svelte';
 	import Plan from '#lib/Plan.svelte';
 	import Settings from '#lib/Settings.svelte';
 	import Sidebar from '#lib/Sidebar.svelte';
 	import Timeline from '#lib/Timeline.svelte';
-	import { fields, meta, selection } from '#lib/state.svelte.js';
+	import { fields, meta, selection, stats } from '#lib/state.svelte.js';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	$effect(() => {
-		const { scenarios, live, fields: list } = data;
+		const { scenarios, live, fields: list, stats: catalog } = data;
+		if (!Object.keys(stats).length) Object.assign(stats, catalog);
 		if (meta.live !== live) meta.live = live;
 		if (
 			meta.scenarios.length !== scenarios.length ||
@@ -30,6 +32,7 @@
 		<div class="relative min-h-0 flex-1">
 			<Map />
 			<Plan />
+			<Layers />
 		</div>
 		<Timeline />
 	</main>

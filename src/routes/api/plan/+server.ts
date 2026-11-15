@@ -36,7 +36,20 @@ export const POST: RequestHandler = async ({ request, fetch }) => {
 	if (!file) error(503, 'no plan index');
 	const stored = await shard(fetch, id);
 	const match = stored?.scenarios?.[resolved];
-	if (!match) error(404, 'no plan for field');
+	const history = stored?.history ?? file.fields[id]?.history;
+	if (!match)
+		return json({
+			results: [
+				{
+					...site({ detail: 'no plan for field' }),
+					history,
+					point: { id, latitude, longitude }
+				}
+			],
+			columns: file.columns,
+			directions: file.directions,
+			rotations: file.rotations
+		});
 	return json({
 		results: [
 			{ ...site(match), history: stored?.history, point: { id, latitude, longitude } }
