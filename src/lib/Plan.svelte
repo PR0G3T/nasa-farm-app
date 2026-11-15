@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { practice, same } from '#lib/data.js';
 	import { METRICS, type Result } from '#lib/farm.js';
 	import { PRIORITIES, pareto, scoresOf, weightsFor } from '#lib/rank.js';
 	import {
@@ -30,6 +31,11 @@
 			: new Set<number>()
 	);
 	const top = $derived(order.slice(0, 5));
+	const ongoing = $derived(
+		selection.field?.kinds?.length
+			? (years: number) => practice(selection.field!, years)
+			: null
+	);
 
 	const format = new Intl.NumberFormat('en', { maximumFractionDigits: 0 });
 	const signed = new Intl.NumberFormat('en', {
@@ -146,7 +152,8 @@
 									{format.format(objective(result, i, 'yield_mean') ?? 0)} kg/ha ·
 									{format.format(objective(result, i, 'water_used') ?? 0)} mm
 									{#if front.has(i)} · pareto{/if}
-									{#if result.rotations[i][0] === selection.field?.kind} · current{/if}
+									{#if ongoing && same(result.rotations[i], ongoing(result.rotations[i].length) ?? [])}
+										· current{/if}
 								</span>
 							</span>
 							<span class="shrink-0 text-xs tabular-nums">{percent.format(scores[i])}</span

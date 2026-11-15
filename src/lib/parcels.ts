@@ -10,6 +10,7 @@ export type Properties = {
 	kind?: string;
 	ha?: number;
 	sequence?: string[];
+	kinds?: (string | null)[];
 };
 
 const close = (ring: [number, number][]) =>
@@ -59,7 +60,8 @@ export function parse(collection: FeatureCollection): Field[] {
 				ha: properties.ha ?? 0,
 				center: centroid(boundary),
 				ring: boundary,
-				sequence: properties.sequence
+				sequence: properties.sequence,
+			kinds: properties.kinds
 			};
 		})
 		.toSorted((first, second) => second.ha - first.ha);
