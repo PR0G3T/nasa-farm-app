@@ -22,7 +22,6 @@
 		if (scenarios.length && !scenarios.includes(selection.scenario)) selection.scenario = scenarios[0];
 		if (fields.length) return;
 		fields.push(...list);
-		selection.field ??= fields[0];
 	});
 </script>
 

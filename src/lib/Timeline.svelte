@@ -72,7 +72,7 @@
 		if (!initialized && historyOffset()) ((view.day = historyOffset()), (initialized = true));
 	});
 
-	let area: HTMLElement;
+	let area = $state<HTMLElement>();
 	let height = $state(HEIGHT_HOME);
 	let anchor = 0;
 	let held = HEIGHT_HOME;
@@ -102,11 +102,13 @@
 	}
 
 	function seek(event: PointerEvent) {
+		if (!area) return;
 		const { left, width } = area.getBoundingClientRect();
 		view.day = dayAt((event.clientX - left) / width, span);
 	}
 
 	function grab(event: PointerEvent) {
+		if (!area) return;
 		tip = null;
 		area.setPointerCapture(event.pointerId);
 		seek(event);
@@ -119,6 +121,7 @@
 	}
 </script>
 
+{#if selection.field}
 <section
 	class="relative flex shrink-0 select-none flex-col border-t border-edge bg-panel"
 	style="height: {height}rem"
@@ -168,7 +171,7 @@
 			onpointerdown={grab}
 			onpointermove={(event) => event.buttons === 1 && seek(event)}
 			onkeydown={step}
-			class="relative flex-1 touch-none"
+			class="relative mr-16 flex-1 touch-none"
 		>
 			<div class="relative h-6 border-b border-edge">
 				{#each ticks(span, historyOffset(), startYear()) as tick (tick.day)}
@@ -246,3 +249,4 @@
 		</div>
 	{/if}
 </section>
+{/if}
