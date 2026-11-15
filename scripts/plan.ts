@@ -32,6 +32,7 @@ const child = Bun.spawn(
 		...(await Bun.file(envFile).exists() ? ['--env-file', envFile] : []),
 		'nasa-farm', 'export',
 		'--fields', '-', '--out', `${app}/static/plan.json`,
+		'--crops', 'maize,soybean,wheat,alfalfa,sorghum,clover,fallow',
 		...scenarios.flatMap((scenario) => ['--scenario', scenario])
 	],
 	{ stdin: 'pipe', stdout: 'inherit', stderr: 'inherit' }
